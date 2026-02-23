@@ -507,7 +507,7 @@ function AnnotationTooltip({
                  value={input}
                  onChange={(e) => setInput(e.target.value)}
                  onKeyDown={(e) => e.key === 'Enter' && handleSend(input)}
-                 placeholder="이미지 내용에 대해 질문하세요..."
+                 placeholder="궁금한 내용에 대해 질문하세요..."
                  disabled={isTyping}
                  className="w-full flex-1 bg-transparent border-transparent rounded-xl pl-3.5 pr-10 py-3 text-[13px] outline-none text-gray-800 placeholder-gray-400 disabled:opacity-50"
                />

@@ -1,37 +1,44 @@
 ## 프롬프트 구성 (Prompt Architecture)
 
-현재 프로젝트는 Google Gemini 2.5 Flash 모델을 사용하여 문서의 분석 및 질의응답을 처리합니다. 각 기능별로 사용되는 시스템 프롬프트 및 사용자 프롬프트는 다음과 같이 구성되어 있습니다.
+현재 프로젝트는 Google Gemini 2.5 Flash 모델을 사용하여 문서의 분석 및 질의응답을 처리합니다.
+API 키는 `localStorage`의 `gemini_api_key` 키로 저장되며, 총 **4곳**에서 호출됩니다.
 
-### 1. 문서 자동 분석 및 요약 프롬프트 (`/api/analyze`)
+| # | 파일 | 호출 방식 | 용도 | 상태 |
+|---|------|-----------|------|------|
+| ① | `MainApp.tsx` | Raw `fetch` (REST, 비스트리밍) | 문서 최초 자동 분석 | ✅ 활성 |
+| ② | ~~`ChatPanel.tsx`~~ | ~~Raw `fetch` (REST, 비스트리밍)~~ | ~~레거시 문서 Q&A 대화~~ | ⚠️ 비활성 (코드만 잔존) |
+| ③ | `right-panel/index.tsx` | SDK `generateContentStream` | 우측 패널 문서 Q&A 대화 | ✅ 활성 |
+| ④ | `PdfViewer.tsx` | SDK `generateContentStream` | 좌측 캡처 영역 분석 챗봇 | ✅ 활성 |
 
-사용자가 PDF 문서를 처음 업로드했을 때, 시스템이 자동으로 문서를 분석하고 핵심 요약 3선, 키워드, 인사이트를 도출하는 프롬프트입니다.
+---
 
-**System Instruction (시스템 명령어)**
+### ① 문서 최초 자동 분석 (`MainApp.tsx`)
+
+PDF 업로드 시 **한 번 자동 실행**되어 요약, 키워드, 인사이트, 이슈를 추출합니다.
+
+**API:** `gemini-2.5-flash:generateContent` (비스트리밍, `responseMimeType: "application/json"`)
+
+**System Instruction:**
 ```text
-You are an expert document analyzer. 
-Analyze the provided document and return a JSON object with EXACTLY the following structure:
+당신은 전문 문서 분석가입니다. 제공된 문서를 분석하여 아래 JSON 구조로 완벽히 답변해 주세요.
+
 {
   "summaries": [
-    {
-      "title": "1. 초보자를 위한 쉬운 설명 (개념 위주)",
-      "content": "..."
-    },
-    {
-      "title": "2. 실무자를 위한 핵심 요약 (빠른 파악)",
-      "content": "..."
-    },
-    {
-      "title": "3. 개발자 관점 심층 분석 (기술 & 보안 중심)",
-      "content": "..."
-    }
+    { "title": "3줄 요약", "content": "문서 핵심 내용을 3개 문장으로 정리" },
+    { "title": "요약", "content": "문서 전체의 주요 흐름 요약" }
   ],
-  "keywords": ["keyword1", "keyword2", "keyword3", "keyword4", "keyword5"],
-  "insights": "List 1-3 highly actionable insights or suggestions based on the document."
+  "keywords": ["키워드1", "키워드2", "키워드3"],
+  "insights": "문서 내 수치나 사실에서 바로 답을 찾을 수 있는 짧은 질문 3가지 (형식: 1. 질문? \n 2. 질문? \n 3. 질문?)",
+  "issues": "논리적으로 오류가 있는 사항이나 확인이 필요한 휴먼에러 요소"
 }
-Ensure the response is valid JSON and written in Korean.
+
+작성 가이드:
+1. insights: 배경지식이 필요한 깊은 분석 대신, 본문 내 데이터로 즉각 답변 가능한 '팩트 체크형' 질문을 작성하세요.
+2. 간결성: 질문은 최대한 짧고 명확하게 한 줄로 구성하세요.
+3. 언어 및 형식: 반드시 한국어로 작성하고, 유효한 JSON 형식만을 반환해야 합니다.
 ```
 
-**User Prompt (사용자 메시지)**
+**User Prompt:**
 ```text
 Here is the document to analyze. Please provide the JSON summary.
 (함께 첨부: Base64로 인코딩된 PDF 파일 원본 - inlineData)
@@ -39,11 +46,13 @@ Here is the document to analyze. Please provide the JSON summary.
 
 ---
 
-### 2. 문서 Q&A 채팅 프롬프트 (`/api/chat`)
+### ~~② 레거시 문서 Q&A 대화 (`ChatPanel.tsx`)~~ ⚠️ 비활성
 
-사용자가 분석된 문서를 바탕으로 AI와 자유롭게 대화할 때 제공되는 프롬프트입니다. PDF 원본뿐만 아니라 시스템이 사전에 추출했던 요약/키워드 정보도 맥락으로 함께 제공하여, 유저가 "1번 요약이 뭐야?" 라고 물어도 컨텍스트를 유지할 수 있도록 설계되어 있습니다.
+이전 버전의 대화형 챗봇. 현재 UI에서는 ③이 대체하여 **코드만 잔존**합니다.
 
-**System Instruction (시스템 명령어)**
+**API:** `gemini-2.5-flash:generateContent` (비스트리밍)
+
+**System Instruction:**
 ```text
 You are an intelligent document assistant.
 You must answer the user's questions based primarily on the context of the provided document.
@@ -51,48 +60,71 @@ If the answer is not in the document, acknowledge that it's not present and do y
 Answer in a friendly, conversational Korean tone.
 ```
 
-**Context Injection (컨텍스트 주입 메시지)**
-*(채팅 시 첫 번째 'User' 메시지의 앞부분에 보이지 않게 자동 삽입됩니다)*
+**Context Injection:** 첫 번째 User 메시지 앞에 분석 데이터(요약, 키워드, 인사이트) + PDF inlineData 자동 삽입
+
+---
+
+### ③ 우측 패널 문서 Q&A 대화 (`right-panel/index.tsx`) ✅ 현행
+
+현재 활성화된 문서 기반 대화 챗봇. Google SDK 스트리밍 응답으로 실시간 타이핑 효과를 제공합니다.
+
+**API:** `GoogleGenerativeAI` SDK → `generateContentStream` (스트리밍)
+
+**System Instruction:**
 ```text
-[이전 분석 내용 요약입니다. 참조하세요]
-[시스템이 자동 분석한 내용 - 맞춤형 핵심 요약 3선]
-(분석 API에서 도출된 요약본 JSON 데이터)
-
-[시스템이 자동 추출한 키워드]
-(도출된 키워드 배열 데이터)
-
-[자동 생성된 인사이트]
-(도출된 인사이트 텍스트)
-
-(함께 첨부: Base64로 인코딩된 PDF 파일 원본 - inlineData)
+당신은 문서 분석 AI 챗봇입니다. 제공된 문서와 사용자의 이전 대화 내역에 기반하여 사용자의 질문에 정확한 답변을 제공하세요.
 ```
 
-**User Prompt (사용자 메시지)**
+**User Prompt:**
 ```text
-(사용자가 실제로 채팅창에 입력한 내용. 예: "이 문서의 주요 개념을 하나만 골라줘")
+이전 대화 내역:
+[사용자]: (이전 메시지)
+[AI]: (이전 응답)
+
+위 문서를 기반으로 답변해주세요.
+(함께 첨부: Base64로 인코딩된 PDF 파일 원본 - inlineData)
 ```
 
 ---
 
-### 3. 좌측 패널 드래그 캡처 챗봇 시스템 프롬프트 (`PdfViewer.tsx - AnnotationTooltip`)
+### ④ 좌측 캡처 영역 분석 챗봇 (`PdfViewer.tsx - AnnotationTooltip`)
 
-사용자가 PDF 뷰어 내에서 특정 영역을 마우스로 드래그하여 캡처했을 때 생성되는 플로팅(미니) 챗봇의 프롬프트입니다. 사용자가 직접 질문하기 전, API 통신을 통해 캡처된 이미지에 대한 빠르고 짧은 초기 요약을 자동으로 제공하도록 설계되었습니다.
+PDF 뷰어에서 마우스 드래그로 영역을 캡처하면 자동 생성되는 미니 챗봇입니다.
+PDF 원본이 아닌 **캡처된 이미지 영역(PNG)**만 첨부됩니다.
 
-**초기 자동 분석 Prompt (주입 메시지)**
-*(챗봇 윈도우가 열리자마자 내부적으로 자동 전송되는 내용)*
+**API:** `GoogleGenerativeAI` SDK → `generateContentStream` (스트리밍)
+
+**System Instruction:** 없음 (모델 기본값). Prompt 자체에서 "3문장 이내", "부연 설명 생략" 등 제약을 부여합니다.
+
+**초기 자동 발송 Prompt** *(챗봇 생성 직후 백그라운드 자동 전송)*:
 ```text
-"선택된 이미지 영역의 핵심 내용을 3문장 이내로 짧고 명확하게 한국어로 요약 및 설명해줘. 불필요한 인사말이나 부연 설명은 생략해."
+선택된 이미지 영역의 핵심 내용을 3문장 이내로 짧고 명확하게 한국어로 요약 및 설명해줘. 불필요한 인사말이나 부연 설명은 생략해.
 ```
 
-**Context Injection & User Prompt (사용자 후속 질문 시)**
-*(초기 요약 이후 사용자가 이어서 질문할 때 제공되는 컨텍스트)*
+**후속 질문 Prompt:**
 ```text
 이전 대화:
-[사용자]: 선택된 이미지 영역의 핵심 내용을 3문장 이내로 짧고 명확하게 한국어로 요약 및 설명해줘. 불필요한 인사말이나 부연 설명은 생략해.
-[AI]: (이전에 응답했던 요약 내용)
+[사용자]: (초기 프롬프트)
+[AI]: (이전 요약 응답)
 
-사용자: (현재 입력한 질문 내용)
+사용자: (현재 입력한 질문)
 
 위 이미지와 이전 대화를 기반으로 한국어로 간결하고 명확하게 답변해줘.
+(함께 첨부: 캡처된 영역의 Base64 인코딩 이미지 - inlineData)
 ```
-*(함께 첨부: 사용자가 캡처한 영역의 Base64 인코딩 이미지 - inlineData)*
+
+---
+
+### 호출 흐름 다이어그램
+
+```
+localStorage("gemini_api_key")
+    │
+    ├── ① MainApp.tsx          → [자동 분석] Raw fetch, JSON 응답, 요약/키워드/인사이트 추출
+    │
+    ├── ② ChatPanel.tsx         → [레거시 Q&A] Raw fetch, 비스트리밍 (현재 비활성)
+    │
+    ├── ③ right-panel/index.tsx → [우측 Q&A]  SDK 스트리밍, PDF 원본 + 대화 히스토리 기반
+    │
+    └── ④ PdfViewer.tsx         → [캡처 챗봇]  SDK 스트리밍, 크롭 이미지 + 자동 3문장 요약
+```
