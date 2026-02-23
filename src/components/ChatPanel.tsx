@@ -3,56 +3,116 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Send, Bot, Sparkles } from "lucide-react";
 
-interface Message {
+export interface Message {
   role: "user" | "ai";
   content: string;
 }
 
 interface ChatPanelProps {
+  sessionId: string | null;
   documentContext: string | null;
   initialContext?: string | null;
   onClearContext?: () => void;
+  savedMessages?: Message[];
+  onUpdateMessages?: (messages: Message[]) => void;
+  isDisabled?: boolean;
 }
 
-export function ChatPanel({ documentContext, initialContext, onClearContext }: ChatPanelProps) {
-  const [messages, setMessages] = useState<Message[]>([]);
+export function ChatPanel({ sessionId, documentContext, initialContext, onClearContext, savedMessages = [], onUpdateMessages, isDisabled }: ChatPanelProps) {
+  const [messages, setMessages] = useState<Message[]>(savedMessages);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const appendUserMessage = useCallback((text: string) => {
-    setMessages(prev => [...prev, { role: "user", content: text }]);
-    setIsTyping(true);
+  // Sync messages when sessionId changes
+  useEffect(() => {
+    setMessages(savedMessages);
+  }, [sessionId]);
 
-    // Mock response
-    // removed mock timeout to ensure only actual API generates the response
-  }, []);
+  const appendUserMessage = useCallback((text: string) => {
+    setMessages(prev => {
+      const updated: Message[] = [...prev, { role: "user", content: text }];
+      onUpdateMessages?.(updated);
+      return updated;
+    });
+    setIsTyping(true);
+  }, [onUpdateMessages]);
+
+  const fetchGeminiResponse = useCallback(async (chatMessages: Message[]) => {
+    const apiKey = localStorage.getItem("gemini_api_key");
+    if (!apiKey) throw new Error("API Key가 설정되지 않았습니다. 우측 상단에서 키를 입력해주세요.");
+
+    let base64Pdf = documentContext;
+    let extraContextText = "";
+
+    if (documentContext?.includes("[원본 PDF Base64 데이터]")) {
+      base64Pdf = documentContext.split("[원본 PDF Base64 데이터]")[1].split("[시스템이 자동 분석한 내용 - 맞춤형 핵심 요약 3선]")[0].trim();
+      extraContextText = documentContext.split("[시스템이 자동 분석한 내용 - 맞춤형 핵심 요약 3선]")[1].trim();
+    }
+
+    const contents = chatMessages.map((msg, index) => {
+      const parts: { text?: string; inlineData?: { data: string; mimeType: string } }[] = [{ text: msg.content }];
+      
+      if (documentContext && msg.role === "user" && index === chatMessages.findIndex(m => m.role === "user")) {
+        if (extraContextText) {
+          parts.unshift({ text: "[이전 분석 내용 요약입니다. 참조하세요]\n" + extraContextText });
+        }
+        parts.unshift({ inlineData: { data: base64Pdf || "", mimeType: "application/pdf" } });
+      }
+
+      return {
+        role: msg.role === "ai" ? "model" : "user",
+        parts
+      };
+    });
+
+    const systemInstruction = `You are an intelligent document assistant.
+You must answer the user's questions based primarily on the context of the provided document.
+If the answer is not in the document, acknowledge that it's not present and do your best to answer based on external knowledge, clearly stating the distinction.
+Answer in a friendly, conversational Korean tone.`;
+
+    const payload = {
+      systemInstruction: { parts: [{ text: systemInstruction }] },
+      contents,
+    };
+
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) throw new Error("Google Gemini API error");
+    
+    const data = await res.json();
+    const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!responseText) throw new Error("No text response from Gemini");
+    
+    return responseText;
+  }, [documentContext]);
 
   useEffect(() => {
     if (initialContext) {
       appendUserMessage(initialContext);
-      if (onClearContext) {
-        onClearContext();
-      }
+      onClearContext?.();
       
       const sendInitial = async () => {
         setIsTyping(true);
         try {
-          const res = await fetch("/api/chat", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              messages: [{ role: "user", content: initialContext }],
-              documentContext,
-            }),
+          const responseText = await fetchGeminiResponse([{ role: "user", content: initialContext }]);
+          setMessages(prev => {
+            const updated: Message[] = [...prev, { role: "ai", content: responseText }];
+            onUpdateMessages?.(updated);
+            return updated;
           });
-
-          if (!res.ok) throw new Error("API request failed");
-          const data = await res.json();
-          setMessages(prev => [...prev, { role: "ai", content: data.response }]);
         } catch (e) {
           console.error(e);
-          setMessages(prev => [...prev, { role: "ai", content: "챗봇 연결 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요." }]);
+          setMessages(prev => {
+            const errorMsg = e instanceof Error ? e.message : "챗봇 연결 중 오류가 발생했습니다.";
+            const updated: Message[] = [...prev, { role: "ai", content: errorMsg }];
+            onUpdateMessages?.(updated);
+            return updated;
+          });
         } finally {
           setIsTyping(false);
         }
@@ -60,7 +120,7 @@ export function ChatPanel({ documentContext, initialContext, onClearContext }: C
       
       sendInitial();
     }
-  }, [initialContext, documentContext, appendUserMessage, onClearContext]);
+  }, [initialContext, appendUserMessage, onClearContext, onUpdateMessages, fetchGeminiResponse]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -75,24 +135,23 @@ export function ChatPanel({ documentContext, initialContext, onClearContext }: C
     appendUserMessage(userMessage);
     setInput("");
 
-    // Call chat API
     try {
-      const res = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          messages: [...messages, { role: "user", content: userMessage }],
-          documentContext,
-        }),
-      });
-
-      if (!res.ok) throw new Error("API request failed");
-      const data = await res.json();
+      const chatHistory = [...messages, { role: "user" as const, content: userMessage }];
+      const responseText = await fetchGeminiResponse(chatHistory);
       
-      setMessages(prev => [...prev, { role: "ai", content: data.response }]);
+      setMessages(prev => {
+        const updated: Message[] = [...prev, { role: "ai", content: responseText }];
+        if (onUpdateMessages) onUpdateMessages(updated);
+        return updated;
+      });
     } catch (e) {
       console.error(e);
-      setMessages(prev => [...prev, { role: "ai", content: "챗봇 연결 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요." }]);
+      setMessages(prev => {
+        const errorMsg = e instanceof Error ? e.message : "챗봇 연결 중 오류가 발생했습니다.";
+        const updated: Message[] = [...prev, { role: "ai", content: errorMsg }];
+        if (onUpdateMessages) onUpdateMessages(updated);
+        return updated;
+      });
     } finally {
       setIsTyping(false);
     }
@@ -156,14 +215,14 @@ export function ChatPanel({ documentContext, initialContext, onClearContext }: C
                 handleSend();
               }
             }}
-            disabled={isTyping}
-            placeholder="이 문서에 대해 질문하세요..."
+            disabled={isTyping || isDisabled}
+            placeholder={isDisabled ? "문서 분석이 끝날 때까지 기다려주세요..." : "이 문서에 대해 질문하세요..."}
             className="w-full flex-1 bg-transparent border-transparent rounded-full pl-5 pr-14 py-3.5 text-sm outline-none text-gray-800 placeholder-gray-400 disabled:opacity-50 disabled:cursor-not-allowed"
           />
           <button
             type="button"
             onClick={handleSend}
-            disabled={!input.trim() || isTyping}
+            disabled={!input.trim() || isTyping || isDisabled}
             className="absolute right-1.5 top-1.5 bottom-1.5 p-2 bg-linear-to-br from-blue-600 to-indigo-600 text-white rounded-full hover:shadow-lg disabled:opacity-50 disabled:hover:shadow-none disabled:cursor-not-allowed transition-all"
           >
             <Send className="w-4 h-4 -translate-x-px translate-y-px" />

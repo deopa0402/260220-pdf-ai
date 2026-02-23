@@ -14,16 +14,27 @@ import { type AnalysisData } from "./MainApp";
 interface AnalysisPanelProps {
   data: AnalysisData | null;
   onSelectContext: (context: string) => void;
+  isLoading?: boolean;
 }
 
-export function AnalysisPanel({ data, onSelectContext }: AnalysisPanelProps) {
+export function AnalysisPanel({ data, onSelectContext, isLoading }: AnalysisPanelProps) {
   const [activeTab, setActiveTab] = useState<"summary" | "keywords" | "insights">("summary");
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-full text-gray-500 bg-white rounded-xl border border-gray-200/60 shadow-sm">
+        <div className="flex flex-col items-center space-y-4">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <p className="text-sm font-medium animate-pulse">AI가 문서를 심층 분석하고 있습니다...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!data) return (
     <div className="flex items-center justify-center h-full text-gray-400 bg-white rounded-xl border border-gray-200/60 shadow-sm">
       <div className="flex flex-col items-center space-y-3">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-        <p className="text-sm font-medium">분석 결과를 기다리는 중입니다...</p>
+        <p className="text-sm font-medium">분석 데이터가 없습니다.</p>
       </div>
     </div>
   );
