@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { FileText, Key, Lightbulb, MessageSquarePlus } from "lucide-react";
+import { FileText, Key, Lightbulb, MessageSquarePlus, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   Accordion,
@@ -18,7 +18,7 @@ interface AnalysisPanelProps {
 }
 
 export function AnalysisPanel({ data, onSelectContext, isLoading }: AnalysisPanelProps) {
-  const [activeTab, setActiveTab] = useState<"summary" | "keywords" | "insights">("summary");
+  const [activeTab, setActiveTab] = useState<"summary" | "issues" | "insights">("summary");
 
   if (isLoading) {
     return (
@@ -43,7 +43,7 @@ export function AnalysisPanel({ data, onSelectContext, isLoading }: AnalysisPane
     <div className="flex flex-col h-full bg-white rounded-xl border border-gray-200/60 shadow-sm overflow-hidden">
       <div className="flex p-2 gap-2 bg-gray-50/80 border-b border-gray-100">
         <TabButton active={activeTab === "summary"} onClick={() => setActiveTab("summary")} icon={<FileText className="w-4 h-4 mr-2" />} label="핵심 요약" />
-        <TabButton active={activeTab === "keywords"} onClick={() => setActiveTab("keywords")} icon={<Key className="w-4 h-4 mr-2" />} label="주요 키워드" />
+        <TabButton active={activeTab === "issues"} onClick={() => setActiveTab("issues")} icon={<AlertTriangle className="w-4 h-4 mr-2" />} label="확인 필요 사항" />
         <TabButton active={activeTab === "insights"} onClick={() => setActiveTab("insights")} icon={<Lightbulb className="w-4 h-4 mr-2" />} label="작업 제안" />
       </div>
 
@@ -72,16 +72,10 @@ export function AnalysisPanel({ data, onSelectContext, isLoading }: AnalysisPane
           </div>
         )}
         
-        {activeTab === "keywords" && (
+        {activeTab === "issues" && (
           <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-            <h3 className="text-lg font-bold text-gray-900 mb-4 tracking-tight">핵심 키워드 추출</h3>
-            <div className="flex flex-wrap gap-2">
-              {data.keywords.map((kw, i) => (
-                <span key={`${kw}-${i}`} className="px-3 py-1.5 bg-blue-50 border border-blue-100 text-blue-700 rounded-lg text-sm font-medium shadow-sm">
-                  {kw}
-                </span>
-              ))}
-            </div>
+            <h3 className="text-lg font-bold text-gray-900 mb-4 tracking-tight">확인 필요 사항</h3>
+            <div className="prose prose-blue max-w-none whitespace-pre-wrap">{data.issues}</div>
           </div>
         )}
 

@@ -1,10 +1,23 @@
 import localforage from "localforage";
 import { v4 as uuidv4 } from "uuid";
-import { AnalysisData } from "@/components/MainApp";
+import type { AnalysisData } from "@/components/MainApp";
 
 export interface Message {
   role: "user" | "ai";
   content: string;
+}
+
+export interface AnnotationMessage {
+  role: "user" | "ai";
+  content: string;
+}
+
+export interface Annotation {
+  id: string; // unique uuid for the annotation
+  position: { x: number; y: number; width: number; height: number; pageNumber: number }; // Absolute position normalized to scale 1.0 (PDF coordinate system)
+  imageOriginBase64: string; // The base64 crop image to be sent to Gemini
+  messages: AnnotationMessage[]; // Mini-chat conversation related to this crop
+  createdAt: number;
 }
 
 export interface PdfSession {
@@ -13,6 +26,7 @@ export interface PdfSession {
   pdfBase64: string; // Used to reconstruct the PDF view and send to API
   analysisData: AnalysisData | null;
   messages: Message[];
+  annotations?: Annotation[]; // New field for persistent tooltip chats
   createdAt: number;
 }
 

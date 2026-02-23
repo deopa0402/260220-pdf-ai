@@ -1,23 +1,14 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import dynamic from "next/dynamic";
 import { PdfUploader } from "./PdfUploader";
-import { AnalysisPanel } from "./AnalysisPanel";
-import { ChatPanel } from "./ChatPanel";
 import { Sidebar } from "./Sidebar";
 import { ApiKeyModal } from "./ApiKeyModal";
 import { Sparkles, ArrowLeft, Menu, Key } from "lucide-react";
-import { store, PdfSession, Message } from "@/lib/store";
-
-const PdfViewer = dynamic(() => import("./PdfViewer").then((mod) => mod.PdfViewer), {
-  ssr: false,
-  loading: () => (
-    <div className="flex items-center justify-center p-12 h-full w-full bg-gray-50/50 rounded-xl">
-      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-    </div>
-  ),
-});
+import { store, PdfSession } from "@/lib/store";
+import { LeftPanel } from "./pdf/left-panel";
+import { RightPanel } from "./pdf/right-panel";
+import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 
 export interface SummaryVariant {
   title: string;
@@ -28,15 +19,13 @@ export interface AnalysisData {
   summaries: SummaryVariant[];
   keywords: string[];
   insights: string;
+  issues: string; // "확인 필요 사항"
 }
 
 export function MainApp({ initialSessionId }: { initialSessionId?: string }) {
   const [fileUrl, setFileUrl] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisData, setAnalysisData] = useState<AnalysisData | null>(null);
-  const [chatContext, setChatContext] = useState<string | null>(null);
-
-  const [docText, setDocText] = useState<string | null>(null);
 
   // Session Data & Sidebar States
   const [sessions, setSessions] = useState<PdfSession[]>([]);
@@ -118,7 +107,6 @@ export function MainApp({ initialSessionId }: { initialSessionId?: string }) {
     setFileUrl(null);
     setAnalysisData(null);
     setCurrentSessionId(null);
-    setChatContext(null);
     if (!skipHistory) {
       window.history.pushState(null, "", "/");
     }
@@ -137,7 +125,6 @@ export function MainApp({ initialSessionId }: { initialSessionId?: string }) {
       
     setFileUrl(restoredUrl);
     setCurrentSessionId(session.id);
-    setChatContext(null);
     
     // Auto-update URL bar without Next.js React re-rendering
     if (!skipHistory && window.location.pathname !== `/${id}`) {
@@ -145,22 +132,8 @@ export function MainApp({ initialSessionId }: { initialSessionId?: string }) {
     }
 
     if (session.analysisData) {
-      setDocText(`
-[원본 PDF Base64 데이터]
-${session.pdfBase64}
-
-[시스템이 자동 분석한 내용 - 맞춤형 핵심 요약 3선]
-${JSON.stringify(session.analysisData.summaries, null, 2)}
-
-[시스템이 자동 추출한 키워드]
-${JSON.stringify(session.analysisData.keywords, null, 2)}
-
-[자동 생성된 인사이트]
-${session.analysisData.insights}
-      `);
       setAnalysisData(session.analysisData);
     } else {
-      setDocText(null);
       setAnalysisData(null);
       runAnalysisForSession(session);
     }
@@ -175,18 +148,28 @@ ${session.analysisData.insights}
     
     setIsAnalyzing(true);
     try {
-      const systemInstruction = `You are an expert document analyzer. 
-Analyze the provided document and return a JSON object with EXACTLY the following structure:
+      const systemInstruction = `당신은 전문 문서 분석가입니다. 제공된 문서를 분석하여 아래 JSON 구조로 완벽히 답변해 주세요.
+
 {
   "summaries": [
-    { "title": "1. 초보자를 위한 쉬운 설명 (개념 위주)", "content": "..." },
-    { "title": "2. 실무자를 위한 핵심 요약 (빠른 파악)", "content": "..." },
-    { "title": "3. 개발자 관점 심층 분석 (기술 & 보안 중심)", "content": "..." }
+    {
+      "title": "3줄 요약",
+      "content": "문서 핵심 내용을 3개 문장으로 정리"
+    },
+    {
+      "title": "요약",
+      "content": "문서 전체의 주요 흐름 요약"
+    }
   ],
-  "keywords": ["keyword1", "keyword2", "keyword3", "keyword4", "keyword5"],
-  "insights": "List 1-3 highly actionable insights or suggestions based on the document."
+  "keywords": ["키워드1", "키워드2", "키워드3"],
+  "insights": "문서 내 수치나 사실에서 바로 답을 찾을 수 있는 짧은 질문 3가지 (형식: 1. 질문? \\n 2. 질문? \\n 3. 질문?)",
+  "issues": "논리적으로 오류가 있는 사항이나 확인이 필요한 휴먼에러 요소"
 }
-Ensure the response is valid JSON and written in Korean.`;
+
+작성 가이드:
+1. insights: 배경지식이 필요한 깊은 분석 대신, 본문 내 데이터로 즉각 답변 가능한 '팩트 체크형' 질문을 작성하세요. 
+2. 간결성: 질문은 최대한 짧고 명확하게 한 줄로 구성하세요.
+3. 언어 및 형식: 반드시 한국어로 작성하고, Array와 String 타입이 위 구조와 일치하는 유효한 JSON 형식만을 반환해야 합니다. Markdown 백틱이나 다른 설명을 덧붙이지 마세요.`;
 
       const payload = {
         systemInstruction: { parts: [{ text: systemInstruction }] },
@@ -222,24 +205,9 @@ Ensure the response is valid JSON and written in Korean.`;
       const data = JSON.parse(responseText);
       data.rawText = session.pdfBase64;
       
-      const fullContextInfo = `
-[원본 PDF Base64 데이터]
-${data.rawText}
-
-[시스템이 자동 분석한 내용 - 맞춤형 핵심 요약 3선]
-${JSON.stringify(data.summaries, null, 2)}
-
-[시스템이 자동 추출한 키워드]
-${JSON.stringify(data.keywords, null, 2)}
-
-[자동 생성된 인사이트]
-${data.insights}
-      `;
-      
       const updatedSession = { ...session, analysisData: data };
       await store.saveSession(updatedSession);
       
-      setDocText(fullContextInfo);
       setAnalysisData(data);
       loadSessions();
     } catch (e) {
@@ -256,16 +224,6 @@ ${data.insights}
       handleReset();
     }
     loadSessions();
-  };
-
-  const handleUpdateMessages = async (newMessages: Message[]) => {
-    if (!currentSessionId) return;
-    const session = await store.getSession(currentSessionId);
-    if (session) {
-      session.messages = newMessages;
-      await store.saveSession(session);
-      loadSessions();
-    }
   };
 
   return (
@@ -359,29 +317,20 @@ ${data.insights}
             </div>
           </div>
         ) : (
-          <div className="h-full flex flex-col lg:flex-row p-4 gap-4 animate-in fade-in duration-500">
-            {/* Left side: PDF Viewer */}
-            <div className="flex-1 lg:w-1/2 h-[45vh] lg:h-full">
-              <PdfViewer fileUrl={fileUrl} />
-            </div>
-            
-            {/* Right side: Analysis & Chat */}
-            <div className="flex-1 lg:w-1/2 h-[50vh] lg:h-full flex flex-col gap-4">
-              <div className="h-1/2 lg:flex-1 min-h-[45vh]">
-                <AnalysisPanel data={analysisData} onSelectContext={setChatContext} isLoading={isAnalyzing} />
-              </div>
-              <div className="h-1/2 lg:flex-1 min-h-[45vh]">
-                  <ChatPanel 
-                   sessionId={currentSessionId}
-                   documentContext={docText}
-                   initialContext={chatContext} 
-                   onClearContext={() => setChatContext(null)} 
-                   savedMessages={sessions.find(s => s.id === currentSessionId)?.messages || []}
-                   onUpdateMessages={handleUpdateMessages}
-                   isDisabled={isAnalyzing || !analysisData}
-                 />
-              </div>
-            </div>
+          <div className="h-full w-full p-2 lg:p-4 bg-gray-50/80 animate-in fade-in zoom-in-95 duration-700">
+            <PanelGroup autoSaveId="pdf-panel-layout" direction="horizontal" className="h-[calc(100vh-5rem)] w-full rounded-2xl overflow-hidden border border-gray-200/60 bg-white">
+              <Panel defaultSize={60} minSize={30} className="relative z-10">
+                <LeftPanel fileUrl={fileUrl} sessionId={currentSessionId} />
+              </Panel>
+              
+              <PanelResizeHandle className="w-2 md:w-3 bg-gray-50 hover:bg-blue-50 transition-colors flex items-center justify-center cursor-col-resize z-20 group border-x border-gray-200/50">
+                <div className="h-8 w-1 rounded-full bg-gray-300 group-hover:bg-blue-400 transition-colors" />
+              </PanelResizeHandle>
+              
+              <Panel defaultSize={40} minSize={15}>
+               <RightPanel analysisData={analysisData} isAnalyzing={isAnalyzing} sessionId={currentSessionId} />
+              </Panel>
+            </PanelGroup>
           </div>
         )}
       </main>
