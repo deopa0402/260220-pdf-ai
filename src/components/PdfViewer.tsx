@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import Draggable from 'react-draggable';
-import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Crop, X, Sparkles, GripHorizontal, Send } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Crop, X, Sparkles, GripHorizontal, Send, Menu } from 'lucide-react';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { store, type Annotation } from '@/lib/store';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
@@ -11,14 +11,22 @@ import 'react-pdf/dist/Page/TextLayer.css';
 
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
+const documentOptions = {
+  cMapUrl: `https://unpkg.com/pdfjs-dist@${pdfjs.version}/cmaps/`,
+  cMapPacked: true,
+  standardFontDataUrl: `https://unpkg.com/pdfjs-dist@${pdfjs.version}/standard_fonts/`,
+};
+
 interface PdfViewerProps {
   fileUrl: string;
   sessionId?: string | null;
+  onOpenSidebar?: () => void;
 }
 
-export function PdfViewer({ fileUrl, sessionId }: PdfViewerProps) {
+export function PdfViewer({ fileUrl, sessionId, onOpenSidebar }: PdfViewerProps) {
   const [numPages, setNumPages] = useState<number>(0);
   const [pageNumber, setPageNumber] = useState(1);
+  const [pageInput, setPageInput] = useState("1");
   const [scale, setScale] = useState(1.0);
 
   // Crop State
@@ -32,7 +40,15 @@ export function PdfViewer({ fileUrl, sessionId }: PdfViewerProps) {
   function onDocumentLoadSuccess({ numPages }: { numPages: number }) {
     setNumPages(numPages);
     setPageNumber(1);
+    setPageInput("1");
   }
+
+  const moveToPage = (nextPage: number) => {
+    const maxPage = numPages > 0 ? numPages : 1;
+    const clamped = Math.min(Math.max(nextPage, 1), maxPage);
+    setPageNumber(clamped);
+    setPageInput(String(clamped));
+  };
 
   // Load annotations from session
   useEffect(() => {
@@ -162,44 +178,90 @@ export function PdfViewer({ fileUrl, sessionId }: PdfViewerProps) {
     if (isCapturing && startPos) handleMouseUp();
   };
 
+  useEffect(() => {
+    setPageInput(String(pageNumber));
+  }, [pageNumber]);
+
   return (
     <div className="flex flex-col h-full bg-gray-100/50 rounded-xl overflow-hidden border border-gray-200/60 shadow-inner">
-      <div className="flex items-center justify-between px-4 py-3 bg-white border-b border-gray-200/60 z-10 shadow-sm">
-        <div className="flex items-center space-x-2">
-          <div className="flex items-center space-x-1 bg-gray-100 rounded-lg p-1">
-            <button 
-              type="button" 
-              onClick={() => setIsCapturing(!isCapturing)} 
-              className={`p-1.5 rounded-md transition-all flex items-center justify-center ${isCapturing ? 'bg-blue-600 text-white shadow-md' : 'hover:bg-white hover:shadow-sm text-gray-700'}`}
-              title="영역 캡처 모드 (드래그하여 캡처)"
+      <div className="grid grid-cols-[auto_1fr_auto] items-center px-4 py-3 bg-white border-b border-gray-200/60 z-10 shadow-sm gap-3">
+        <div className="flex items-center">
+          {onOpenSidebar && (
+            <button
+              type="button"
+              onClick={onOpenSidebar}
+              className="p-1.5 rounded-md hover:bg-gray-100 text-gray-700 transition-colors"
+              title="사이드바 열기"
             >
-              <Crop className="w-4 h-4" />
+              <Menu className="w-4 h-4" />
+            </button>
+          )}
+
+        </div>
+
+        <div className="flex items-center justify-center gap-2 md:gap-3 min-w-0">
+          <button
+            type="button"
+            onClick={() => setIsCapturing(prev => !prev)}
+            className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all flex items-center justify-center gap-1.5 shrink-0 ${isCapturing ? 'bg-blue-600 text-white shadow-md' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'}`}
+            title="영역 캡처 모드 (드래그하여 캡처)"
+          >
+            <Crop className="w-3.5 h-3.5" />
+            영역 선택
+          </button>
+
+          <div className="flex items-center space-x-1 bg-gray-100 rounded-lg p-1 shrink-0">
+            <button
+              type="button"
+              onClick={() => moveToPage(pageNumber - 1)}
+              disabled={pageNumber <= 1}
+              className="p-1.5 rounded-md hover:bg-white hover:shadow-sm disabled:opacity-40 transition-all text-gray-700"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+
+            <div className="flex items-center gap-1 px-1">
+              <input
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                value={pageInput}
+                onChange={(e) => setPageInput(e.target.value.replace(/[^0-9]/g, ""))}
+                onBlur={() => {
+                  const parsed = Number.parseInt(pageInput, 10);
+                  if (Number.isNaN(parsed)) {
+                    setPageInput(String(pageNumber));
+                    return;
+                  }
+                  moveToPage(parsed);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    const parsed = Number.parseInt(pageInput, 10);
+                    if (Number.isNaN(parsed)) {
+                      setPageInput(String(pageNumber));
+                      return;
+                    }
+                    moveToPage(parsed);
+                  }
+                }}
+                className="w-14 px-2 py-1 text-sm font-medium text-center text-gray-700 bg-white border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                aria-label="페이지 번호 입력"
+              />
+              <span className="text-sm text-gray-400 font-normal">/ {numPages || "-"}</span>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => moveToPage(pageNumber + 1)}
+              disabled={pageNumber >= numPages}
+              className="p-1.5 rounded-md hover:bg-white hover:shadow-sm disabled:opacity-40 transition-all text-gray-700"
+            >
+              <ChevronRight className="w-4 h-4" />
             </button>
           </div>
-          
-          <div className="flex items-center space-x-1 bg-gray-100 rounded-lg p-1">
-          <button
-            type="button"
-            onClick={() => setPageNumber(prev => Math.max(prev - 1, 1))}
-            disabled={pageNumber <= 1}
-            className="p-1.5 rounded-md hover:bg-white hover:shadow-sm disabled:opacity-40 transition-all text-gray-700"
-          >
-            <ChevronLeft className="w-4 h-4" />
-          </button>
-          <span className="text-sm font-medium w-16 text-center text-gray-700">
-            {pageNumber} <span className="text-gray-400 font-normal">/ {numPages || '-'}</span>
-          </span>
-          <button
-            type="button"
-            onClick={() => setPageNumber(prev => Math.min(prev + 1, numPages))}
-            disabled={pageNumber >= numPages}
-            className="p-1.5 rounded-md hover:bg-white hover:shadow-sm disabled:opacity-40 transition-all text-gray-700"
-          >
-            <ChevronRight className="w-4 h-4" />
-          </button>
-        </div>
-        </div>
-        <div className="flex items-center space-x-1 bg-gray-100 rounded-lg p-1">
+
+          <div className="flex items-center space-x-1 bg-gray-100 rounded-lg p-1 shrink-0">
           <button type="button" onClick={() => setScale(prev => Math.max(prev - 0.2, 0.5))} className="p-1.5 rounded-md hover:bg-white hover:shadow-sm transition-all text-gray-700">
             <ZoomOut className="w-4 h-4" />
           </button>
@@ -207,13 +269,17 @@ export function PdfViewer({ fileUrl, sessionId }: PdfViewerProps) {
           <button type="button" onClick={() => setScale(prev => Math.min(prev + 0.2, 3))} className="p-1.5 rounded-md hover:bg-white hover:shadow-sm transition-all text-gray-700">
             <ZoomIn className="w-4 h-4" />
           </button>
+          </div>
         </div>
+
+        <div className="w-8" aria-hidden="true" />
       </div>
       
       <div className="flex-1 overflow-auto p-4 custom-scrollbar bg-gray-100/50 relative">
         <div className="mx-auto min-w-[700px] w-fit flex justify-center pb-12 px-[400px]">
           <Document
             file={fileUrl}
+            options={documentOptions}
             onLoadSuccess={onDocumentLoadSuccess}
             className="drop-shadow-xl"
             loading={
@@ -292,45 +358,17 @@ function AnnotationTooltip({
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const didAutoSendRef = useRef(false);
 
-  // Update position when scale changes
-  useEffect(() => {
-    setPosition({ x: annotation.position.x * scale, y: annotation.position.y * scale });
-  }, [scale, annotation.position.x, annotation.position.y]);
-
-  useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
-  }, [annotation.messages, isTyping]);
-
-  useEffect(() => {
-    // Initial auto-send
-    if (annotation.messages.length === 0 && !isTyping) {
-      handleSend("이 영역에 대해 분석하고 설명해줘", true);
-    }
-  // biome-ignore lint/correctness/useExhaustiveDependencies: auto-send once
-  }, []);
-
-  const handleStop = (_: unknown, data: { x: number; y: number }) => {
-    const newX = data.x / scale;
-    const newY = data.y / scale;
-    setPosition({ x: data.x, y: data.y });
-    onUpdate({
-      ...annotation,
-      position: { ...annotation.position, x: newX, y: newY }
-    });
-  };
-
-  const handleSend = async (content: string, isInitial = false) => {
+  const handleSend = useCallback(async (content: string, isInitial = false) => {
     if (!content.trim() || isTyping) return;
-    
+
     let currentMessages = annotation.messages;
     if (!isInitial) {
       currentMessages = [...annotation.messages, { role: "user" as const, content: content.trim() }];
       onUpdate({ ...annotation, messages: currentMessages });
     }
-    
+
     setInput("");
     setIsTyping(true);
 
@@ -342,7 +380,7 @@ function AnnotationTooltip({
       const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
       const historyParts = currentMessages.map(m => `[${m.role === "user" ? "사용자" : "AI"}]: ${m.content}`).join("\\n\\n");
-      const prompt = isInitial 
+      const prompt = isInitial
         ? "선택된 이미지 영역의 핵심 내용을 3문장 이내로 짧고 명확하게 한국어로 요약 및 설명해줘. 불필요한 인사말이나 부연 설명은 생략해."
         : `이전 대화:\\n${historyParts}\\n\\n사용자: ${content}\\n\\n위 이미지와 이전 대화를 기반으로 한국어로 간결하고 명확하게 답변해줘.`;
 
@@ -357,7 +395,6 @@ function AnnotationTooltip({
       ]);
 
       let botResponse = "";
-      // Initialize empty AI response chunk for streaming effect
       const streamingMessages = [...currentMessages, { role: "ai" as const, content: "" }];
       onUpdate({ ...annotation, messages: streamingMessages });
 
@@ -366,7 +403,6 @@ function AnnotationTooltip({
         const updated = [...currentMessages, { role: "ai" as const, content: botResponse }];
         onUpdate({ ...annotation, messages: updated });
       }
-
     } catch (err) {
       console.error(err);
       onUpdate({
@@ -376,6 +412,35 @@ function AnnotationTooltip({
     } finally {
       setIsTyping(false);
     }
+  }, [annotation, isTyping, onUpdate]);
+
+  // Update position when scale changes
+  useEffect(() => {
+    setPosition({ x: annotation.position.x * scale, y: annotation.position.y * scale });
+  }, [scale, annotation.position.x, annotation.position.y]);
+
+  useEffect(() => {
+    const messageCount = annotation.messages.length;
+    if (!scrollRef.current) return;
+    if (messageCount === 0 && !isTyping) return;
+    scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+  }, [annotation.messages.length, isTyping]);
+
+  useEffect(() => {
+    if (didAutoSendRef.current || isTyping) return;
+    if (annotation.messages.length !== 0) return;
+    didAutoSendRef.current = true;
+    void handleSend("이 영역에 대해 분석하고 설명해줘", true);
+  }, [annotation.messages.length, isTyping, handleSend]);
+
+  const handleStop = (_: unknown, data: { x: number; y: number }) => {
+    const newX = data.x / scale;
+    const newY = data.y / scale;
+    setPosition({ x: data.x, y: data.y });
+    onUpdate({
+      ...annotation,
+      position: { ...annotation.position, x: newX, y: newY }
+    });
   };
 
   return (
@@ -394,7 +459,7 @@ function AnnotationTooltip({
                <div className="h-6 w-6 shrink-0 bg-blue-50 rounded flex items-center justify-center mr-2">
                  <Sparkles className="w-3.5 h-3.5 text-blue-600"/>
                </div>
-               <span className="text-[13px] font-bold text-gray-800 truncate">캡처 영역 분석 챗봇</span>
+               <span className="text-[13px] font-bold text-gray-800 truncate">선택 영역 분석 내용</span>
             </div>
             <div className="flex items-center pr-2 gap-1">
                <button type="button" onClick={onClose} className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors" title="닫기 및 삭제">
@@ -410,7 +475,7 @@ function AnnotationTooltip({
                  <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center">
                    <Sparkles className="w-4 h-4 text-blue-500" />
                  </div>
-                 <p className="font-medium text-[12.5px]">이미지를 심층 분석하고 있습니다...</p>
+                 <p className="font-medium text-[12.5px]">분석 중...</p>
                </div>
              ) : (
                annotation.messages.map((msg, i) => (

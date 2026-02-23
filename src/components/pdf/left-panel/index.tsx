@@ -17,14 +17,15 @@ const PdfViewerComponent = dynamic(() => import("../../PdfViewer").then((mod) =>
 interface LeftPanelProps {
   fileUrl: string | null;
   sessionId: string | null;
+  onOpenSidebar?: () => void;
 }
 
-export function LeftPanel({ fileUrl, sessionId }: LeftPanelProps) {
+export function LeftPanel({ fileUrl, sessionId, onOpenSidebar }: LeftPanelProps) {
   if (!fileUrl) return null;
 
   return (
     <div className="h-full bg-white rounded-2xl border border-gray-200/60 shadow-lg overflow-hidden flex flex-col relative z-10">
-      <PdfViewerComponent fileUrl={fileUrl} sessionId={sessionId} />
+      <PdfViewerComponent fileUrl={fileUrl} sessionId={sessionId} onOpenSidebar={onOpenSidebar} />
     </div>
   );
 }

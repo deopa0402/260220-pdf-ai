@@ -226,6 +226,8 @@ export function MainApp({ initialSessionId }: { initialSessionId?: string }) {
     loadSessions();
   };
 
+  const isSessionPage = Boolean(fileUrl && currentSessionId);
+
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-gray-50 text-gray-900 font-sans">
       <ApiKeyModal 
@@ -252,48 +254,50 @@ export function MainApp({ initialSessionId }: { initialSessionId?: string }) {
         onClose={() => setIsSidebarOpen(false)} 
       />
 
-      <header className="bg-white/80 backdrop-blur-md border-b border-gray-200/80 h-16 shrink-0 flex items-center px-4 sm:px-6 shadow-sm z-30">
-        <button
-          type="button"
-          onClick={() => setIsSidebarOpen(true)}
-          className="p-2 mr-3 rounded-lg hover:bg-gray-100 text-gray-700 transition-colors"
-        >
-          <Menu className="w-5 h-5" />
-        </button>
-        <div className="flex items-center">
-          <div className="w-8 h-8 rounded-lg bg-linear-to-br from-blue-600 to-indigo-600 flex flex-col items-center justify-center mr-3 shadow-md">
-            <Sparkles className="w-5 h-5 text-white" />
+      {!isSessionPage && (
+        <header className="bg-white/80 backdrop-blur-md border-b border-gray-200/80 h-16 shrink-0 flex items-center px-4 sm:px-6 shadow-sm z-30">
+          <button
+            type="button"
+            onClick={() => setIsSidebarOpen(true)}
+            className="p-2 mr-3 rounded-lg hover:bg-gray-100 text-gray-700 transition-colors"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+          <div className="flex items-center">
+            <div className="w-8 h-8 rounded-lg bg-linear-to-br from-blue-600 to-indigo-600 flex flex-col items-center justify-center mr-3 shadow-md">
+              <Sparkles className="w-5 h-5 text-white" />
+            </div>
+            <h1 className="text-xl font-bold bg-linear-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent tracking-tight">
+              Gemini <span className="text-blue-600 font-extrabold">PDF AI</span>
+            </h1>
           </div>
-          <h1 className="text-xl font-bold bg-linear-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent tracking-tight">
-            Gemini <span className="text-blue-600 font-extrabold">PDF AI</span>
-          </h1>
-        </div>
-        
-        <div className="ml-auto flex items-center gap-2">
-          {!fileUrl && (
-            <button 
-              type="button"
-              onClick={() => setIsKeyModalOpen(true)}
-              className="text-sm font-medium text-gray-600 hover:text-blue-600 bg-white hover:bg-blue-50 border border-gray-200 hover:border-blue-200 rounded-lg px-3 py-2 transition-colors flex items-center shadow-sm"
-              title="API Key 설정"
-            >
-              <Key className="w-4 h-4 mr-0 sm:mr-2" />
-              <span className="hidden sm:inline">API Key 설정</span>
-            </button>
-          )}
-          
-          {fileUrl && (
-            <button 
-              type="button"
-              onClick={() => handleReset()}
-              className="text-sm font-medium text-gray-600 hover:text-gray-900 bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded-lg px-4 py-2 transition-colors flex items-center shadow-sm"
-            >
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              새 문서 분석
-            </button>
-          )}
-        </div>
-      </header>
+
+          <div className="ml-auto flex items-center gap-2">
+            {!fileUrl && (
+              <button
+                type="button"
+                onClick={() => setIsKeyModalOpen(true)}
+                className="text-sm font-medium text-gray-600 hover:text-blue-600 bg-white hover:bg-blue-50 border border-gray-200 hover:border-blue-200 rounded-lg px-3 py-2 transition-colors flex items-center shadow-sm"
+                title="API Key 설정"
+              >
+                <Key className="w-4 h-4 mr-0 sm:mr-2" />
+                <span className="hidden sm:inline">API Key 설정</span>
+              </button>
+            )}
+
+            {fileUrl && (
+              <button
+                type="button"
+                onClick={() => handleReset()}
+                className="text-sm font-medium text-gray-600 hover:text-gray-900 bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded-lg px-4 py-2 transition-colors flex items-center shadow-sm"
+              >
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                새 문서 분석
+              </button>
+            )}
+          </div>
+        </header>
+      )}
 
       <main className="flex-1 overflow-hidden relative">
         {!fileUrl ? (
@@ -317,10 +321,14 @@ export function MainApp({ initialSessionId }: { initialSessionId?: string }) {
             </div>
           </div>
         ) : (
-          <div className="h-full w-full p-2 lg:p-4 bg-gray-50/80 animate-in fade-in zoom-in-95 duration-700">
-            <PanelGroup autoSaveId="pdf-panel-layout" direction="horizontal" className="h-[calc(100vh-5rem)] w-full rounded-2xl overflow-hidden border border-gray-200/60 bg-white">
+          <div className="h-full w-full p-2 lg:p-4 bg-gray-50/80 animate-in fade-in zoom-in-95 duration-700 relative">
+            <PanelGroup autoSaveId="pdf-panel-layout" direction="horizontal" className="h-full w-full rounded-2xl overflow-hidden border border-gray-200/60 bg-white">
               <Panel defaultSize={60} minSize={30} className="relative z-10">
-                <LeftPanel fileUrl={fileUrl} sessionId={currentSessionId} />
+                <LeftPanel
+                  fileUrl={fileUrl}
+                  sessionId={currentSessionId}
+                  onOpenSidebar={isSessionPage ? () => setIsSidebarOpen(true) : undefined}
+                />
               </Panel>
               
               <PanelResizeHandle className="w-2 md:w-3 bg-gray-50 hover:bg-blue-50 transition-colors flex items-center justify-center cursor-col-resize z-20 group border-x border-gray-200/50">
