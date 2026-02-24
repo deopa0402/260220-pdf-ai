@@ -1,4 +1,5 @@
 import { Bot, Sparkles } from "lucide-react";
+import { MarkdownRenderer } from "../shared/MarkdownRenderer";
 
 interface Message {
   role: "user" | "ai";
@@ -8,9 +9,13 @@ interface Message {
 interface Props {
   messages: Message[];
   isTyping: boolean;
+  onCitationClick?: (page: number) => void;
+}
+  messages: Message[];
+  isTyping: boolean;
 }
 
-export function ChatTimeline({ messages, isTyping }: Props) {
+export function ChatTimeline({ messages, isTyping, onCitationClick }: Props) {
 
   if (messages.length === 0) {
     return (
@@ -38,7 +43,7 @@ export function ChatTimeline({ messages, isTyping }: Props) {
               ? "bg-blue-600 text-white rounded-tr-sm" 
               : "bg-white border text-gray-800 rounded-tl-sm"
           }`}>
-            <div className="whitespace-pre-wrap">{msg.content}</div>
+            <MarkdownRenderer content={msg.content} onCitationClick={onCitationClick} />
           </div>
         </div>
       ))}

@@ -32,6 +32,7 @@ export function MarkdownRenderer({ content, onCitationClick }: MarkdownRendererP
             return (
               <CitationBadge
                 index={citationNumber}
+                onClick={() => onCitationClick(citationNumber)}
               />
             );
           }
