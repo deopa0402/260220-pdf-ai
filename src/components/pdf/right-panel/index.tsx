@@ -128,9 +128,9 @@ export function RightPanel({ analysisData, isAnalyzing, sessionId, fileName, onC
           {analysisData && (
             <>
               <Keywords keywords={analysisData.keywords} />
-              <ThreeLineSummary summary={analysisData.summaries[0]} />
-              <DetailedSummary summary={analysisData.summaries[1]} />
-              <CheckPoints issues={analysisData.issues} />
+              <ThreeLineSummary summary={analysisData.summaries[0]} onCitationClick={onCitationClick} />
+              <DetailedSummary summary={analysisData.summaries[1]} onCitationClick={onCitationClick} />
+              <CheckPoints issues={analysisData.issues} onCitationClick={onCitationClick} />
             </>
           )}
           

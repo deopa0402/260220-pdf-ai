@@ -158,22 +158,23 @@ export function MainApp({ initialSessionId }: { initialSessionId?: string }) {
   "summaries": [
     {
       "title": "3줄 요약",
-      "content": "문서 핵심 내용을 3개 문장으로 정리"
+      "content": "문서 핵심 내용을 3개 문장으로 정리. 각 문장 끝에 근거 출처를 [N페이지] 형식으로 포함"
     },
     {
       "title": "요약",
-      "content": "문서 전체의 주요 흐름 요약"
+      "content": "문서 전체의 주요 흐름 요약. 근거 문장에는 [N페이지] 형식 출처 포함"
     }
   ],
   "keywords": ["키워드1", "키워드2", "키워드3"],
   "insights": "문서 내 수치나 사실에서 바로 답을 찾을 수 있는 짧은 질문 3가지 (형식: 1. 질문? \\n 2. 질문? \\n 3. 질문?)",
-  "issues": "논리적으로 오류가 있는 사항이나 확인이 필요한 휴먼에러 요소"
+  "issues": "논리적으로 오류가 있는 사항이나 확인이 필요한 휴먼에러 요소. 근거가 있으면 [N페이지] 형식 출처 포함"
 }
 
 작성 가이드:
 1. insights: 배경지식이 필요한 깊은 분석 대신, 본문 내 데이터로 즉각 답변 가능한 '팩트 체크형' 질문을 작성하세요. 
 2. 간결성: 질문은 최대한 짧고 명확하게 한 줄로 구성하세요.
-3. 언어 및 형식: 반드시 한국어로 작성하고, Array와 String 타입이 위 구조와 일치하는 유효한 JSON 형식만을 반환해야 합니다. Markdown 백틱이나 다른 설명을 덧붙이지 마세요.`;
+3. summaries.content, issues: 사실/주장 문장에는 반드시 [N페이지] 형식의 출처를 포함하세요. 예: "...설명입니다.[3페이지]"
+4. 언어 및 형식: 반드시 한국어로 작성하고, Array와 String 타입이 위 구조와 일치하는 유효한 JSON 형식만을 반환해야 합니다. Markdown 백틱이나 다른 설명을 덧붙이지 마세요.`;
 
       const payload = {
         systemInstruction: { parts: [{ text: systemInstruction }] },
@@ -335,6 +336,7 @@ export function MainApp({ initialSessionId }: { initialSessionId?: string }) {
                 <LeftPanel
                   fileUrl={fileUrl}
                   sessionId={currentSessionId}
+                  pageNumber={pageNumber}
                   fileName={currentFileName}
                   onOpenSidebar={isSessionPage ? () => setIsSidebarOpen(true) : undefined}
                   onCitationClick={handleCitationClick}

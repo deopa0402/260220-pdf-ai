@@ -17,12 +17,13 @@ const PdfViewerComponent = dynamic(() => import("../../PdfViewer").then((mod) =>
 interface LeftPanelProps {
   fileUrl: string | null;
   sessionId: string | null;
+  pageNumber?: number;
   fileName?: string | null;
   onOpenSidebar?: () => void;
   onCitationClick?: (page: number) => void;
 }
 
-export function LeftPanel({ fileUrl, sessionId, fileName, onOpenSidebar, onCitationClick }: LeftPanelProps) {
+export function LeftPanel({ fileUrl, sessionId, pageNumber, fileName, onOpenSidebar, onCitationClick }: LeftPanelProps) {
   if (!fileUrl) return null;
 
   return (
@@ -34,7 +35,7 @@ export function LeftPanel({ fileUrl, sessionId, fileName, onOpenSidebar, onCitat
           </h2>
         </div>
       )}
-      <PdfViewerComponent fileUrl={fileUrl} sessionId={sessionId} onOpenSidebar={onOpenSidebar} onCitationClick={onCitationClick} />
+      <PdfViewerComponent fileUrl={fileUrl} sessionId={sessionId} targetPageNumber={pageNumber} onOpenSidebar={onOpenSidebar} onCitationClick={onCitationClick} />
     </div>
   );
 }

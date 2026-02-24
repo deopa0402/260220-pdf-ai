@@ -1,11 +1,13 @@
 import { FileText } from "lucide-react";
 import type { SummaryVariant } from "../../MainApp";
+import { MarkdownRenderer } from "../shared/MarkdownRenderer";
 
 interface Props {
   summary?: SummaryVariant;
+  onCitationClick?: (page: number) => void;
 }
 
-export function ThreeLineSummary({ summary }: Props) {
+export function ThreeLineSummary({ summary, onCitationClick }: Props) {
   if (!summary) return null;
 
   return (
@@ -14,8 +16,8 @@ export function ThreeLineSummary({ summary }: Props) {
         <FileText className="w-3.5 h-3.5 mr-1.5 text-blue-600" /> {summary.title}
       </div>
       <div className="bg-blue-50/40 border border-blue-100/60 rounded-xl p-4">
-        <div className="text-[13.5px] text-gray-700 leading-snug whitespace-pre-wrap">
-          {summary.content}
+        <div className="text-[13.5px] text-gray-700 leading-snug">
+          <MarkdownRenderer content={summary.content} onCitationClick={onCitationClick} />
         </div>
       </div>
     </div>

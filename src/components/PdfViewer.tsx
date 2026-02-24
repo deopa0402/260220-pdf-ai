@@ -20,11 +20,12 @@ const documentOptions = {
 interface PdfViewerProps {
   fileUrl: string;
   sessionId?: string | null;
+  targetPageNumber?: number;
   onOpenSidebar?: () => void;
   onCitationClick?: (page: number) => void;
 }
 
-export function PdfViewer({ fileUrl, sessionId, onOpenSidebar, onCitationClick }: PdfViewerProps) {
+export function PdfViewer({ fileUrl, sessionId, targetPageNumber, onOpenSidebar, onCitationClick }: PdfViewerProps) {
   const [numPages, setNumPages] = useState<number>(0);
   const [pageNumber, setPageNumber] = useState(1);
   const [pageInput, setPageInput] = useState("1");
@@ -50,6 +51,12 @@ export function PdfViewer({ fileUrl, sessionId, onOpenSidebar, onCitationClick }
     setPageNumber(clamped);
     setPageInput(String(clamped));
   };
+
+  useEffect(() => {
+    if (typeof targetPageNumber !== "number") return;
+    if (numPages <= 0) return;
+    moveToPage(targetPageNumber);
+  }, [targetPageNumber, numPages]);
 
   // Load annotations from session
   useEffect(() => {

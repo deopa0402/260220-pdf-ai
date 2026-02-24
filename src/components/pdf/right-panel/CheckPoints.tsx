@@ -1,10 +1,12 @@
 import { AlertTriangle } from "lucide-react";
+import { MarkdownRenderer } from "../shared/MarkdownRenderer";
 
 interface Props {
   issues?: string;
+  onCitationClick?: (page: number) => void;
 }
 
-export function CheckPoints({ issues }: Props) {
+export function CheckPoints({ issues, onCitationClick }: Props) {
   if (!issues) return null;
 
   return (
@@ -13,8 +15,8 @@ export function CheckPoints({ issues }: Props) {
         <AlertTriangle className="w-3.5 h-3.5 mr-1.5" /> 확인 필요 사항
       </div>
       <div className="bg-rose-50/50 border border-rose-100 p-4 rounded-xl space-y-2.5">
-        <div className="text-[13px] text-rose-800 leading-snug font-medium whitespace-pre-wrap">
-          {issues}
+        <div className="text-[13px] text-rose-800 leading-snug font-medium">
+          <MarkdownRenderer content={issues} onCitationClick={onCitationClick} />
         </div>
       </div>
     </div>
