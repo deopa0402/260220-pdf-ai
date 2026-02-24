@@ -63,7 +63,7 @@ export function RightPanel({ analysisData, isAnalyzing, sessionId, fileName, onC
       const genAI = new GoogleGenerativeAI(apiKey);
       const model = genAI.getGenerativeModel({ 
         model: "gemini-2.5-flash",
-        systemInstruction: "당신은 문서 분석 AI 챗봇입니다. 제공된 문서와 사용자의 이전 대화 내역에 기반하여 사용자의 질문에 정확한 답변을 제공하세요. 답변할 때 출처를 [N페이지] 형식으로 포함하세요."
+        systemInstruction: "당신은 문서 분석 AI 챗봇입니다. 제공된 문서와 사용자의 이전 대화 내역에 기반하여 사용자의 질문에 정확한 답변을 제공하세요. 답변할 때 출처를 [Np] 형식으로 포함하세요. 여러 페이지는 [1p],[2p]처럼 표기하세요."
       });
 
       const historyParts = newMessages.map(m => `[${m.role === "user" ? "사용자" : "AI"}]: ${m.content}`).join("\\n\\n");

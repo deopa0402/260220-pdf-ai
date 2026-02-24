@@ -12,7 +12,13 @@ import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 
 export interface SummaryVariant {
   title: string;
-  content: string;
+  content?: string;
+  lines?: ReferenceLine[];
+}
+
+export interface ReferenceLine {
+  text: string;
+  pages: number[];
 }
 
 export interface AnalysisData {
@@ -20,7 +26,7 @@ export interface AnalysisData {
   summaries: SummaryVariant[];
   keywords: string[];
   insights: string;
-  issues: string; // "확인 필요 사항"
+  issues: string | ReferenceLine[]; // "확인 필요 사항"
 }
 
 export function MainApp({ initialSessionId }: { initialSessionId?: string }) {
@@ -160,24 +166,36 @@ export function MainApp({ initialSessionId }: { initialSessionId?: string }) {
   "summaries": [
     {
       "title": "3줄 요약",
-      "content": "문서 핵심 내용을 3개 문장으로 정리. 각 문장 끝에 근거 출처를 [N페이지] 형식으로 포함"
+      "lines": [
+        { "text": "첫 번째 핵심 문장", "pages": [1] },
+        { "text": "두 번째 핵심 문장", "pages": [2, 3] },
+        { "text": "세 번째 핵심 문장", "pages": [4] }
+      ]
     },
     {
       "title": "요약",
-      "content": "문서 전체의 주요 흐름 요약. 근거 문장에는 [N페이지] 형식 출처 포함"
+      "lines": [
+        { "text": "문서 전체의 주요 흐름 요약 문장", "pages": [1] },
+        { "text": "핵심 근거 및 결론 문장", "pages": [2, 5] }
+      ]
     }
   ],
   "keywords": ["키워드1", "키워드2", "키워드3"],
   "insights": "문서 내 수치나 사실에서 바로 답을 찾을 수 있는 짧은 질문 3가지 (형식: 1. 질문? \\n 2. 질문? \\n 3. 질문?)",
-  "issues": "논리적으로 오류가 있는 사항이나 확인이 필요한 휴먼에러 요소. 근거가 있으면 [N페이지] 형식 출처 포함"
+  "issues": [
+    { "text": "논리적으로 확인이 필요한 사항", "pages": [6] },
+    { "text": "휴먼에러 가능성이 있는 표현", "pages": [7, 8] }
+  ]
 }
 
 작성 가이드:
 1. title: 문서 전체를 대표하는 짧고 명확한 제목을 반드시 작성하세요.
 2. insights: 배경지식이 필요한 깊은 분석 대신, 본문 내 데이터로 즉각 답변 가능한 '팩트 체크형' 질문을 작성하세요. 
 3. 간결성: 질문은 최대한 짧고 명확하게 한 줄로 구성하세요.
-4. summaries.content, issues: 사실/주장 문장에는 반드시 [N페이지] 형식의 출처를 포함하세요. 예: "...설명입니다.[3페이지]"
-5. 언어 및 형식: 반드시 한국어로 작성하고, Array와 String 타입이 위 구조와 일치하는 유효한 JSON 형식만을 반환해야 합니다. Markdown 백틱이나 다른 설명을 덧붙이지 마세요.`;
+4. 3줄 요약은 summaries[0].lines에 정확히 3개 항목을 넣으세요. 각 항목은 text/pages를 모두 가져야 합니다.
+5. pages는 숫자 배열만 허용합니다. 예: [1] 또는 [1,2]. 문자열/대괄호 텍스트 금지.
+6. summaries[1]과 issues도 동일하게 text/pages 구조로 작성하세요.
+7. 언어 및 형식: 반드시 한국어로 작성하고, 위 구조와 정확히 일치하는 유효한 JSON만 반환하세요. Markdown 백틱이나 다른 설명을 덧붙이지 마세요.`;
 
       const payload = {
         systemInstruction: { parts: [{ text: systemInstruction }] },
@@ -210,17 +228,74 @@ export function MainApp({ initialSessionId }: { initialSessionId?: string }) {
       
       if (!responseText) throw new Error("No response from Gemini API");
 
-      const data = JSON.parse(responseText);
-      const normalizedTitle = typeof data.title === "string" && data.title.trim().length > 0
-        ? data.title.trim()
-        : session.fileName;
-      data.title = normalizedTitle;
-      data.rawText = session.pdfBase64;
+      const data = JSON.parse(responseText) as Partial<AnalysisData> & {
+        title?: unknown;
+        summaries?: unknown;
+        keywords?: unknown;
+        insights?: unknown;
+        issues?: unknown;
+      };
+
+      const normalizePages = (value: unknown): number[] => {
+        if (!Array.isArray(value)) return [];
+        const seen = new Set<number>();
+        for (const v of value) {
+          const n = typeof v === "number" ? v : Number.parseInt(String(v), 10);
+          if (Number.isFinite(n) && n > 0) {
+            seen.add(n);
+          }
+        }
+        return Array.from(seen);
+      };
+
+      const normalizeLine = (line: unknown): ReferenceLine | null => {
+        if (!line || typeof line !== "object") return null;
+        const candidate = line as { text?: unknown; pages?: unknown };
+        const text = typeof candidate.text === "string" ? candidate.text.trim() : "";
+        if (!text) return null;
+        return {
+          text,
+          pages: normalizePages(candidate.pages),
+        };
+      };
+
+      const normalizedSummaries: SummaryVariant[] = [];
+      if (Array.isArray(data.summaries)) {
+        for (const item of data.summaries) {
+          if (!item || typeof item !== "object") continue;
+          const s = item as { title?: unknown; content?: unknown; lines?: unknown };
+          const title = typeof s.title === "string" && s.title.trim() ? s.title.trim() : "요약";
+          const lines = Array.isArray(s.lines)
+            ? s.lines.map(normalizeLine).filter((v): v is ReferenceLine => v !== null)
+            : [];
+          const content = typeof s.content === "string" ? s.content : undefined;
+          normalizedSummaries.push({ title, lines: lines.length > 0 ? lines : undefined, content });
+        }
+      }
+
+      const normalizedIssues = Array.isArray(data.issues)
+        ? data.issues.map(normalizeLine).filter((v): v is ReferenceLine => v !== null)
+        : typeof data.issues === "string"
+          ? data.issues
+          : "";
+
+      const normalizedData: AnalysisData = {
+        title:
+          typeof data.title === "string" && data.title.trim().length > 0
+            ? data.title.trim()
+            : session.fileName,
+        summaries: normalizedSummaries,
+        keywords: Array.isArray(data.keywords) ? data.keywords.filter((k): k is string => typeof k === "string") : [],
+        insights: typeof data.insights === "string" ? data.insights : "",
+        issues: normalizedIssues,
+      };
+
+      (normalizedData as AnalysisData & { rawText: string }).rawText = session.pdfBase64;
       
-      const updatedSession = { ...session, analysisData: data };
+      const updatedSession = { ...session, analysisData: normalizedData };
       await store.saveSession(updatedSession);
       
-      setAnalysisData(data);
+      setAnalysisData(normalizedData);
       loadSessions();
     } catch (e) {
       console.error(e);

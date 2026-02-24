@@ -63,7 +63,7 @@ export function AnalysisPanel({ data, onSelectContext, isLoading }: AnalysisPane
                   </AccordionTrigger>
                   <AccordionContent className="bg-white pt-2 pb-4">
                     <div className="prose prose-blue max-w-none whitespace-pre-wrap text-[14px]">
-                      {variant.content}
+                      {variant.content ?? (Array.isArray(variant.lines) ? variant.lines.map((line) => line.text).join("\n") : "")}
                     </div>
                   </AccordionContent>
                 </AccordionItem>
@@ -75,7 +75,7 @@ export function AnalysisPanel({ data, onSelectContext, isLoading }: AnalysisPane
         {activeTab === "issues" && (
           <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
             <h3 className="text-lg font-bold text-gray-900 mb-4 tracking-tight">확인 필요 사항</h3>
-            <div className="prose prose-blue max-w-none whitespace-pre-wrap">{data.issues}</div>
+            <div className="prose prose-blue max-w-none whitespace-pre-wrap">{typeof data.issues === "string" ? data.issues : data.issues.map((line) => line.text).join("\n")}</div>
           </div>
         )}
 

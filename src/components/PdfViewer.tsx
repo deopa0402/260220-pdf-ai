@@ -389,8 +389,8 @@ function AnnotationTooltip({
 
       const historyParts = currentMessages.map(m => `[${m.role === "user" ? "사용자" : "AI"}]: ${m.content}`).join("\\n\\n");
       const prompt = isInitial
-        ? "선택된 이미지 영역의 핵심 내용을 3문장 이내로 짧고 명확하게 한국어로 요약 및 설명해줘. 불필요한 인사말이나 부연 설명은 생략해. 답변할 때 출처를 [N페이지] 형식으로 포함하세요."
-        : `이전 대화:\\n${historyParts}\\n\\n사용자: ${content}\\n\\n위 이미지와 이전 대화를 기반으로 한국어로 간결하고 명확하게 답변해줘. 답변할 때 출처를 [N페이지] 형식으로 포함하세요.`;
+        ? "선택된 이미지 영역의 핵심 내용을 3문장 이내로 짧고 명확하게 한국어로 요약 및 설명해줘. 불필요한 인사말이나 부연 설명은 생략해. 답변할 때 출처를 [Np] 형식으로 포함하고, 여러 페이지는 [1p],[2p]처럼 표기하세요."
+        : `이전 대화:\\n${historyParts}\\n\\n사용자: ${content}\\n\\n위 이미지와 이전 대화를 기반으로 한국어로 간결하고 명확하게 답변해줘. 답변할 때 출처를 [Np] 형식으로 포함하고, 여러 페이지는 [1p],[2p]처럼 표기하세요.`;
 
       const base64Data = annotation.imageOriginBase64.split(",")[1];
       const mimeType = annotation.imageOriginBase64.split(";")[0].split(":")[1];

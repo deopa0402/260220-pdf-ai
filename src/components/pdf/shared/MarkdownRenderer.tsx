@@ -1,19 +1,26 @@
 "use client";
 
+import { useRef, useState } from "react";
 import { cloneElement, isValidElement, type ReactElement, type ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeSanitize from "rehype-sanitize";
 import { CitationBadge } from "./CitationBadge";
+import { cn } from "@/lib/utils";
 
 interface MarkdownRendererProps {
   content: string;
   onCitationClick?: (page: number) => void;
 }
 
-const citationRegex = /\[(\d+)페이지\]/g;
+const citationRegex = /\[(\d+)(?:p|페이지)\]/g;
 
-function injectCitationBadges(node: ReactNode, onCitationClick?: (page: number) => void): ReactNode {
+function injectCitationBadges(
+  node: ReactNode,
+  onCitationClick?: (page: number) => void,
+  sentenceId?: string,
+  onHoverSentence?: (sentenceId: string | null) => void
+): ReactNode {
   if (typeof node === "string") {
     const pieces: ReactNode[] = [];
     let lastIndex = 0;
@@ -30,6 +37,8 @@ function injectCitationBadges(node: ReactNode, onCitationClick?: (page: number) 
           key={`citation-${match.index}-${page}`}
           page={page}
           onClick={onCitationClick ? () => onCitationClick(page) : undefined}
+          onMouseEnter={sentenceId && onHoverSentence ? () => onHoverSentence(sentenceId) : undefined}
+          onMouseLeave={onHoverSentence ? () => onHoverSentence(null) : undefined}
         />
       );
 
@@ -45,7 +54,7 @@ function injectCitationBadges(node: ReactNode, onCitationClick?: (page: number) 
   }
 
   if (Array.isArray(node)) {
-    return node.map((child) => injectCitationBadges(child, onCitationClick));
+    return node.map((child) => injectCitationBadges(child, onCitationClick, sentenceId, onHoverSentence));
   }
 
   if (isValidElement(node)) {
@@ -53,13 +62,22 @@ function injectCitationBadges(node: ReactNode, onCitationClick?: (page: number) 
     if (elementChildren === undefined) return node;
 
     const element = node as ReactElement<{ children?: ReactNode }>;
-    return cloneElement(element, undefined, injectCitationBadges(elementChildren, onCitationClick));
+    return cloneElement(element, undefined, injectCitationBadges(elementChildren, onCitationClick, sentenceId, onHoverSentence));
   }
 
   return node;
 }
 
 export function MarkdownRenderer({ content, onCitationClick }: MarkdownRendererProps) {
+  const [hoveredSentenceId, setHoveredSentenceId] = useState<string | null>(null);
+  const sentenceCounterRef = useRef(0);
+  sentenceCounterRef.current = 0;
+
+  const nextSentenceId = () => {
+    sentenceCounterRef.current += 1;
+    return `sentence-${sentenceCounterRef.current}`;
+  };
+
   return (
     <ReactMarkdown
       remarkPlugins={[remarkGfm]}
@@ -79,27 +97,47 @@ export function MarkdownRenderer({ content, onCitationClick }: MarkdownRendererP
 
           if (citationNumber && !isNaN(citationNumber) && onCitationClick) {
             return (
-              <CitationBadge
-                page={citationNumber}
-                onClick={() => onCitationClick(citationNumber)}
-              />
-            );
-          }
+                <CitationBadge
+                  page={citationNumber}
+                  onClick={() => onCitationClick(citationNumber)}
+                />
+              );
+            }
 
           return <sup {...props}>{children}</sup>;
         },
-        p: ({ children }) => (
-          <p className="mb-3 last:mb-0">{injectCitationBadges(children, onCitationClick)}</p>
-        ),
+        p: ({ children }) => {
+          const sentenceId = nextSentenceId();
+          return (
+            <p
+              className={cn(
+                "mb-3 last:mb-0 rounded-md transition-all duration-150",
+                hoveredSentenceId === sentenceId && "bg-amber-50/70 shadow-[inset_0_0_0_1px_rgba(251,191,36,0.35),0_2px_10px_rgba(0,0,0,0.08)] px-2 py-1"
+              )}
+            >
+              {injectCitationBadges(children, onCitationClick, sentenceId, setHoveredSentenceId)}
+            </p>
+          );
+        },
         ul: ({ children }) => (
           <ul className="list-disc list-inside mb-3 space-y-1">{children}</ul>
         ),
         ol: ({ children }) => (
           <ol className="list-decimal list-inside mb-3 space-y-1">{children}</ol>
         ),
-        li: ({ children }) => (
-          <li className="ml-2">{injectCitationBadges(children, onCitationClick)}</li>
-        ),
+        li: ({ children }) => {
+          const sentenceId = nextSentenceId();
+          return (
+            <li
+              className={cn(
+                "ml-2 rounded-md transition-all duration-150",
+                hoveredSentenceId === sentenceId && "bg-amber-50/70 shadow-[inset_0_0_0_1px_rgba(251,191,36,0.35),0_2px_10px_rgba(0,0,0,0.08)] px-2 py-1"
+              )}
+            >
+              {injectCitationBadges(children, onCitationClick, sentenceId, setHoveredSentenceId)}
+            </li>
+          );
+        },
         h1: ({ children }) => (
           <h1 className="text-xl font-bold mb-2 mt-4">{injectCitationBadges(children, onCitationClick)}</h1>
         ),
@@ -114,7 +152,7 @@ export function MarkdownRenderer({ content, onCitationClick }: MarkdownRendererP
         ),
         blockquote: ({ children }) => (
           <blockquote className="border-l-4 border-gray-300 pl-3 italic my-3 text-gray-700">
-            {injectCitationBadges(children, onCitationClick)}
+            {injectCitationBadges(children, onCitationClick, nextSentenceId(), setHoveredSentenceId)}
           </blockquote>
         ),
         code: ({ className, children, ...props }) => {
