@@ -16,6 +16,7 @@ export interface SummaryVariant {
 }
 
 export interface AnalysisData {
+  title?: string;
   summaries: SummaryVariant[];
   keywords: string[];
   insights: string;
@@ -155,6 +156,7 @@ export function MainApp({ initialSessionId }: { initialSessionId?: string }) {
       const systemInstruction = `당신은 전문 문서 분석가입니다. 제공된 문서를 분석하여 아래 JSON 구조로 완벽히 답변해 주세요.
 
 {
+  "title": "문서의 핵심 주제를 15자 내외로 요약한 제목",
   "summaries": [
     {
       "title": "3줄 요약",
@@ -171,10 +173,11 @@ export function MainApp({ initialSessionId }: { initialSessionId?: string }) {
 }
 
 작성 가이드:
-1. insights: 배경지식이 필요한 깊은 분석 대신, 본문 내 데이터로 즉각 답변 가능한 '팩트 체크형' 질문을 작성하세요. 
-2. 간결성: 질문은 최대한 짧고 명확하게 한 줄로 구성하세요.
-3. summaries.content, issues: 사실/주장 문장에는 반드시 [N페이지] 형식의 출처를 포함하세요. 예: "...설명입니다.[3페이지]"
-4. 언어 및 형식: 반드시 한국어로 작성하고, Array와 String 타입이 위 구조와 일치하는 유효한 JSON 형식만을 반환해야 합니다. Markdown 백틱이나 다른 설명을 덧붙이지 마세요.`;
+1. title: 문서 전체를 대표하는 짧고 명확한 제목을 반드시 작성하세요.
+2. insights: 배경지식이 필요한 깊은 분석 대신, 본문 내 데이터로 즉각 답변 가능한 '팩트 체크형' 질문을 작성하세요. 
+3. 간결성: 질문은 최대한 짧고 명확하게 한 줄로 구성하세요.
+4. summaries.content, issues: 사실/주장 문장에는 반드시 [N페이지] 형식의 출처를 포함하세요. 예: "...설명입니다.[3페이지]"
+5. 언어 및 형식: 반드시 한국어로 작성하고, Array와 String 타입이 위 구조와 일치하는 유효한 JSON 형식만을 반환해야 합니다. Markdown 백틱이나 다른 설명을 덧붙이지 마세요.`;
 
       const payload = {
         systemInstruction: { parts: [{ text: systemInstruction }] },
@@ -208,6 +211,10 @@ export function MainApp({ initialSessionId }: { initialSessionId?: string }) {
       if (!responseText) throw new Error("No response from Gemini API");
 
       const data = JSON.parse(responseText);
+      const normalizedTitle = typeof data.title === "string" && data.title.trim().length > 0
+        ? data.title.trim()
+        : session.fileName;
+      data.title = normalizedTitle;
       data.rawText = session.pdfBase64;
       
       const updatedSession = { ...session, analysisData: data };
@@ -236,6 +243,7 @@ export function MainApp({ initialSessionId }: { initialSessionId?: string }) {
   };
 
   const isSessionPage = Boolean(fileUrl && currentSessionId);
+  const panelTitle = analysisData?.title?.trim() || currentFileName;
 
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-gray-50 text-gray-900 font-sans">
@@ -337,7 +345,7 @@ export function MainApp({ initialSessionId }: { initialSessionId?: string }) {
                   fileUrl={fileUrl}
                   sessionId={currentSessionId}
                   pageNumber={pageNumber}
-                  fileName={currentFileName}
+                  fileName={panelTitle}
                   onOpenSidebar={isSessionPage ? () => setIsSidebarOpen(true) : undefined}
                   onCitationClick={handleCitationClick}
                 />
@@ -348,7 +356,7 @@ export function MainApp({ initialSessionId }: { initialSessionId?: string }) {
               </PanelResizeHandle>
               
               <Panel defaultSize={40} minSize={15}>
-               <RightPanel analysisData={analysisData} isAnalyzing={isAnalyzing} sessionId={currentSessionId} fileName={currentFileName} onCitationClick={handleCitationClick} />
+               <RightPanel analysisData={analysisData} isAnalyzing={isAnalyzing} sessionId={currentSessionId} fileName={panelTitle} onCitationClick={handleCitationClick} />
               </Panel>
             </PanelGroup>
           </div>
