@@ -17,9 +17,10 @@ interface RightPanelProps {
   analysisData: AnalysisData | null;
   isAnalyzing?: boolean;
   sessionId?: string | null;
+  onCitationClick?: (page: number) => void;
 }
 
-export function RightPanel({ analysisData, isAnalyzing, sessionId }: RightPanelProps) {
+export function RightPanel({ analysisData, isAnalyzing, sessionId, onCitationClick }: RightPanelProps) {
   const [session, setSession] = useState<PdfSession | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [isTyping, setIsTyping] = useState(false);

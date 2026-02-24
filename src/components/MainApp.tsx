@@ -26,6 +26,7 @@ export function MainApp({ initialSessionId }: { initialSessionId?: string }) {
   const [fileUrl, setFileUrl] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisData, setAnalysisData] = useState<AnalysisData | null>(null);
+  const [pageNumber, setPageNumber] = useState(1);
 
   // Session Data & Sidebar States
   const [sessions, setSessions] = useState<PdfSession[]>([]);
@@ -226,6 +227,10 @@ export function MainApp({ initialSessionId }: { initialSessionId?: string }) {
     loadSessions();
   };
 
+  const handleCitationClick = (page: number) => {
+    setPageNumber(page);
+  };
+
   const isSessionPage = Boolean(fileUrl && currentSessionId);
 
   return (
@@ -328,6 +333,7 @@ export function MainApp({ initialSessionId }: { initialSessionId?: string }) {
                   fileUrl={fileUrl}
                   sessionId={currentSessionId}
                   onOpenSidebar={isSessionPage ? () => setIsSidebarOpen(true) : undefined}
+                  onCitationClick={handleCitationClick}
                 />
               </Panel>
               
@@ -336,7 +342,7 @@ export function MainApp({ initialSessionId }: { initialSessionId?: string }) {
               </PanelResizeHandle>
               
               <Panel defaultSize={40} minSize={15}>
-               <RightPanel analysisData={analysisData} isAnalyzing={isAnalyzing} sessionId={currentSessionId} />
+               <RightPanel analysisData={analysisData} isAnalyzing={isAnalyzing} sessionId={currentSessionId} onCitationClick={handleCitationClick} />
               </Panel>
             </PanelGroup>
           </div>

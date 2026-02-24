@@ -18,14 +18,15 @@ interface LeftPanelProps {
   fileUrl: string | null;
   sessionId: string | null;
   onOpenSidebar?: () => void;
+  onCitationClick?: (page: number) => void;
 }
 
-export function LeftPanel({ fileUrl, sessionId, onOpenSidebar }: LeftPanelProps) {
+export function LeftPanel({ fileUrl, sessionId, onOpenSidebar, onCitationClick }: LeftPanelProps) {
   if (!fileUrl) return null;
 
   return (
     <div className="h-full bg-white rounded-2xl border border-gray-200/60 shadow-lg overflow-hidden flex flex-col relative z-10">
-      <PdfViewerComponent fileUrl={fileUrl} sessionId={sessionId} onOpenSidebar={onOpenSidebar} />
+      <PdfViewerComponent fileUrl={fileUrl} sessionId={sessionId} onOpenSidebar={onOpenSidebar} onCitationClick={onCitationClick} />
     </div>
   );
 }

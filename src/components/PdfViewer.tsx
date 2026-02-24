@@ -21,9 +21,10 @@ interface PdfViewerProps {
   fileUrl: string;
   sessionId?: string | null;
   onOpenSidebar?: () => void;
+  onCitationClick?: (page: number) => void;
 }
 
-export function PdfViewer({ fileUrl, sessionId, onOpenSidebar }: PdfViewerProps) {
+export function PdfViewer({ fileUrl, sessionId, onOpenSidebar, onCitationClick }: PdfViewerProps) {
   const [numPages, setNumPages] = useState<number>(0);
   const [pageNumber, setPageNumber] = useState(1);
   const [pageInput, setPageInput] = useState("1");

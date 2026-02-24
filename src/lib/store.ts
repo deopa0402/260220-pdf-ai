@@ -5,11 +5,13 @@ import type { AnalysisData } from "@/components/MainApp";
 export interface Message {
   role: "user" | "ai";
   content: string;
+  citations?: number[];
 }
 
 export interface AnnotationMessage {
   role: "user" | "ai";
   content: string;
+  citations?: number[];
 }
 
 export interface Annotation {
