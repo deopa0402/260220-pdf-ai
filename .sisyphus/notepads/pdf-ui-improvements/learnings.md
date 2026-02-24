@@ -114,3 +114,207 @@ MainApp → RightPanel
 - CitationBadge는 빨간색 배경으로 시각적 강조
 - 버튼 요소 사용으로 클릭 가능성 명시
 - onClick는 옵셔널이므로 없어도 렌더링 가능
+
+## Wave 4 - Task 8: CitationBadge 컴포넌트 생성
+
+### 컴포넌트 요구사항
+- 클릭 가능한 버튼 UI (빨간색 배경, hover 시 어두운색)
+- [N페이지] 형식 표시
+- onClick prop 받아서 호출
+
+### 구현 패턴
+1. **Props 인터페이스**: `page: number`, `onClick?: () => void`
+2. **버튼 스타일링**:
+   - `bg-red-600 hover:bg-red-700`: 빨간색 배경, hover 시 어두운색
+   - `text-white`: 흰색 텍스트
+   - `px-2 py-0.5 text-xs`: 작은 패딩과 폰트
+   - `rounded`: 둥근 모서리
+   - `ml-1`: 왼쪽 마진 (인라인 요소 간 간격)
+3. **텍스트 표시**: `[{page}페이지]` 형식으로 템플릿 리터럴 사용
+
+### MarkdownRenderer와의 통합
+- MarkdownRenderer의 `sup` 커스텀 컴포넌트에서 CitationBadge 사용
+- `index={citationNumber}`에서 `page={citationNumber}`로 prop 변경
+- 클릭 시 `onCitationClick(citationNumber)` 호출
+
+### 주의사항
+- CitationBadge는 인라인 버튼으로 설계 (superscript가 아님)
+- 빨간색 배경으로 출처를 명확하게 시각화
+- 간단한 버튼 UI만 유지 (툴팁, 분석 등 복잡한 UI 금지)
+
+## Wave 4 - Task 7: parseCitations 유틸리티 함수 생성
+
+### 함수 목적
+텍스트에서 `[N페이지]` 패턴을 찾아 CitationBadge 컴포넌트로 변환하는 유틸리티 함수
+
+### 구현 패턴
+1. **Regex 패턴**: `/\[(\d+)페이지\]/g`
+   - `[` 시작 문자열
+   - `(\d+)`: 하나 이상의 숫자를 캡처 그룹으로 저장
+   - `페이지`: 고정 문자열
+   - `]`: 종료 문자열
+   - `g`: 전역 플래그 (모든 매칭을 찾음)
+
+2. **분할 알고리즘**:
+   - `regex.exec(text)`로 순차적 매칭
+   - `lastIndex`로 마지막 처리 위치 추적
+   - 매칭 전 텍스트는 문자열로 저장
+   - 매칭된 부분은 CitationBadge로 변환
+
+3. **React.createElement 사용**:
+   - JSX를 사용하지 않고 `createElement` 함수로 React 요소 생성
+   - `createElement(CitationBadge, { page: pageNumber })` 형태
+   - 반환 타입: `ReactNode[]` (문자열과 React 요소의 혼합 배열)
+
+### 테스트 결과
+- `'이 내용은 [5페이지]에 설명되어 있습니다.'` → `["이 내용은 ", <CitationBadge page=5 />, "에 설명되어 있습니다."]`
+- `'인용: [10페이지], 참고: [15페이지]'` → `["인용: ", <CitationBadge page=10 />, ", 참고: ", <CitationBadge page=15 />]`
+- `'아무 인용이 없는 텍스트'` → `["아무 인용이 없는 텍스트"]`
+
+### 주의사항
+- CitationBadge의 prop 이름은 `page` (not `index`)
+- 빈 문자열 매칭 시 빈 배열 반환 (regex.exec가 null 반환)
+- Fragment import 제거 (사용하지 않음)
+
+### 향후 사용처
+- 마크다운 렌더링 외의 일반 텍스트에서 출처 표시 필요 시 사용
+- AI 응답이 마크다운이 아닌 경우에도 출처 변환 가능
+
+## Wave 5 - Task 9: LeftPanel 제목 표시 UI 추가
+
+### 컴포넌트 수정 패턴
+1. **LeftPanel Props 확장**: `fileName?: string | null` prop 추가
+2. **MainApp 상태 관리**: `currentFileName` state 추가 및 관리
+   - `handleFileUpload`: 파일 업로드 시 fileName 저장 (session.fileName)
+   - `handleSelectSession`: 세션 선택 시 fileName 업데이트
+   - `handleReset`: 리셋 시 fileName 초기화
+3. **Props 전달**: LeftPanel에 `fileName={currentFileName}` 전달
+
+### 제목 표시 UI 구현
+- **위치**: LeftPanel 상단, PdfViewerComponent 위에 위치
+- **조건부 렌더링**: `fileName && (...)`로 존재할 때만 표시
+- **스타일링**:
+  - 컨테이너: `shrink-0 px-4 py-3 border-b border-gray-200/60 bg-gray-50/50`
+  - 제목: `text-sm font-semibold text-gray-800 truncate`
+  - `title` 속성: hover 시 전체 파일명 표시
+
+### 텍스트 Truncation 패턴
+- **Tailwind `truncate` 클래스**: 너무 긴 텍스트를 `...`로 자동 생략
+- **`title` 속성**: 마우스 hover 시 전체 텍스트 표시 (접근성 향상)
+- **반응형**: 스크롤 없이도 UI 깔끔하게 유지
+
+### 타입 정의
+- `fileName?: string | null`: null과 undefined 모두 허용
+- MainApp의 `currentFileName` state 타입과 일치
+- TypeScript의 null vs undefined 구문 오류 방지
+
+### 주의사항
+- 제목 편집 기능 없음 (요구사항)
+- 툴팁 등 복잡한 UI 추가하지 않음
+- 간단한 truncation만으로 충분 (추가 기능 금지)
+
+### 성능 최적화
+- `shrink-0` 클래스로 높이 고정 (레이아웃 이동 방지)
+- 조건부 렌더링으로 불필요한 DOM 제거
+
+
+
+## Wave 5 - Task 10: RightPanel Props 추가 (fileName, onCitationClick)
+
+### 인터페이스 수정 패턴
+1. **RightPanelProps 인터페이스 확장**:
+   - `fileName?: string;` prop 추가
+   - `onCitationClick?: (page: number) => void;` prop (이미 존재, 유지)
+   - 기존 props (analysisData, isAnalyzing, sessionId) 유지
+
+2. **컴포넌트 함수 파라미터 업데이트**:
+   - 함수 시그니처에 `fileName` 추가
+   - `export function RightPanel({ analysisData, isAnalyzing, sessionId, fileName, onCitationClick }: RightPanelProps)`
+
+### MainApp 상태 관리 추가
+1. **상태 정의**:
+   - `const [currentFileName, setCurrentFileName] = useState<string | undefined>(undefined);`
+
+2. **상태 업데이트 로직**:
+   - `handleSelectSession`: `setCurrentFileName(session.fileName)`
+   - `handleReset`: `setCurrentFileName(undefined)`
+
+3. **Props 전달**:
+   - `<RightPanel ... fileName={currentFileName} onCitationClick={handleCitationClick} />`
+
+### 타입 일관성
+- MainApp의 `currentFileName`은 `string | undefined` (null 아님)
+- RightPanelProps의 `fileName`은 `string | undefined` (? 옵셔널 포함)
+- TypeScript 타입 오류 방지: null과 undefined를 구분
+
+### Props 전달 체인 확인
+- MainApp → RightPanel: fileName, onCitationClick 전달 ✅
+- RightPanel → ChatTimeline: onCitationClick 전달 (이미 완료)
+- ChatTimeline → MarkdownRenderer: onCitationClick 전달 (이미 완료)
+- MarkdownRenderer → CitationBadge: onClick 전달 (이미 완료)
+
+### 주의사항
+- fileName prop 현재 사용하지 않음 (hint 발생 - 향후 태스크에서 활용 예정)
+- onCitationClick는 이미 존재하므로 유지만 하면 됨
+- 상태 초기화 시 undefined 사용 (null 타입 오류 방지)
+
+### LSP Diagnostics 정리
+- 모든 파일에서 타입 에러 해결
+- hint는 사용하지 않는 변수(fileName) 관련으로 향후 태스크 예상
+
+
+
+## Wave 5 - Task 11: RightPanel 고정 헤더 추가
+
+### 컴포넌트 수정 패턴
+1. **고정 헤더 위치**: RightPanel의 최상단 (scrollable content 위)
+2. **조건부 렌더링**: `fileName && (...)`로 파일명이 있을 때만 표시
+
+### Sticky Header 패턴
+- **className**: `shrink-0 px-4 py-3 border-b border-gray-200/60 bg-gray-50/50 sticky top-0 z-10`
+  - `shrink-0`: 높이 고정 (flexbox에서 축소 방지)
+  - `px-4 py-3`: padding (가로 4, 세로 3)
+  - `border-b border-gray-200/60`: 하단 경계선 (60% 투명도)
+  - `bg-gray-50/50`: 회색 배경 (50% 투명도)
+  - `sticky top-0`: 스크롤 시 상단 고정
+  - `z-10`: 다른 요소 위에 표시
+
+### 텍스트 Truncation 패턴
+- **className**: `text-sm font-semibold text-gray-800 truncate`
+  - `text-sm`: 작은 폰트 (14px)
+  - `font-semibold`: 반볼드
+  - `text-gray-800`: 어두운 회색 텍스트
+  - `truncate`: 긴 텍스트 자동 생략 (overflow hidden + text-overflow ellipsis + white-space nowrap)
+
+### Props 활용
+- `fileName` prop (Wave 5 Task 10에서 추가)을 직접 사용
+- 파일명이 없을 경우(header) 빈 상태로 렌더링하지 않음 (조건부 렌더링)
+
+### 레이아웃 구조
+```
+<RightPanel>
+  <div className="flex flex-col h-full">
+    {/* Sticky Header */}
+    <header className="sticky top-0 z-10">
+      <h2 className="truncate">{fileName}</h2>
+    </header>
+    {/* Scrollable Content */}
+    <div className="flex-1 overflow-y-auto">
+      {/* Analysis Sections */}
+      {/* Chat Sections */}
+    </div>
+    {/* Bottom Input */}
+    <ChatInput />
+  </div>
+</RightPanel>
+```
+
+### 주의사항
+- **고정 헤더**: 스크롤 시 항상 상단에 위치 (사용자 경험 향상)
+- **간단한 UI**: 툴팁, 편집 기능 없음 (요구사항 준수)
+- **z-index**: 다른 요소와 겹치지 않도록 적절한 z-index 설정
+- **투명도 배경**: `bg-gray-50/50`으로 미세한 투명도로 깔끔한 느낌
+
+### 성능 최적화
+- `shrink-0`으로 높이 고정 (불필요한 리렌더링 방지)
+- 조건부 렌더링으로 불필요한 DOM 제거

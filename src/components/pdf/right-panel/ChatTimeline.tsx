@@ -11,9 +11,7 @@ interface Props {
   isTyping: boolean;
   onCitationClick?: (page: number) => void;
 }
-  messages: Message[];
-  isTyping: boolean;
-}
+
 
 export function ChatTimeline({ messages, isTyping, onCitationClick }: Props) {
 

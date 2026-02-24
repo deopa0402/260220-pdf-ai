@@ -34,6 +34,7 @@ export function MainApp({ initialSessionId }: { initialSessionId?: string }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isKeyModalOpen, setIsKeyModalOpen] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [currentFileName, setCurrentFileName] = useState<string | undefined>(undefined);
 
   // Load Sessions on Mount and Handle History Popstate
   // biome-ignore lint/correctness/useExhaustiveDependencies: initial setup only
@@ -108,6 +109,7 @@ export function MainApp({ initialSessionId }: { initialSessionId?: string }) {
     setFileUrl(null);
     setAnalysisData(null);
     setCurrentSessionId(null);
+    setCurrentFileName(undefined);
     if (!skipHistory) {
       window.history.pushState(null, "", "/");
     }
@@ -126,6 +128,7 @@ export function MainApp({ initialSessionId }: { initialSessionId?: string }) {
       
     setFileUrl(restoredUrl);
     setCurrentSessionId(session.id);
+    setCurrentFileName(session.fileName);
     
     // Auto-update URL bar without Next.js React re-rendering
     if (!skipHistory && window.location.pathname !== `/${id}`) {
@@ -332,6 +335,7 @@ export function MainApp({ initialSessionId }: { initialSessionId?: string }) {
                 <LeftPanel
                   fileUrl={fileUrl}
                   sessionId={currentSessionId}
+                  fileName={currentFileName}
                   onOpenSidebar={isSessionPage ? () => setIsSidebarOpen(true) : undefined}
                   onCitationClick={handleCitationClick}
                 />
@@ -342,7 +346,7 @@ export function MainApp({ initialSessionId }: { initialSessionId?: string }) {
               </PanelResizeHandle>
               
               <Panel defaultSize={40} minSize={15}>
-               <RightPanel analysisData={analysisData} isAnalyzing={isAnalyzing} sessionId={currentSessionId} onCitationClick={handleCitationClick} />
+               <RightPanel analysisData={analysisData} isAnalyzing={isAnalyzing} sessionId={currentSessionId} fileName={currentFileName} onCitationClick={handleCitationClick} />
               </Panel>
             </PanelGroup>
           </div>

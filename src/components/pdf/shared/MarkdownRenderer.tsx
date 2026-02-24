@@ -31,7 +31,7 @@ export function MarkdownRenderer({ content, onCitationClick }: MarkdownRendererP
           if (citationNumber && !isNaN(citationNumber) && onCitationClick) {
             return (
               <CitationBadge
-                index={citationNumber}
+                page={citationNumber}
                 onClick={() => onCitationClick(citationNumber)}
               />
             );

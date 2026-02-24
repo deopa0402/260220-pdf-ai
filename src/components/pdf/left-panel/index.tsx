@@ -17,15 +17,23 @@ const PdfViewerComponent = dynamic(() => import("../../PdfViewer").then((mod) =>
 interface LeftPanelProps {
   fileUrl: string | null;
   sessionId: string | null;
+  fileName?: string | null;
   onOpenSidebar?: () => void;
   onCitationClick?: (page: number) => void;
 }
 
-export function LeftPanel({ fileUrl, sessionId, onOpenSidebar, onCitationClick }: LeftPanelProps) {
+export function LeftPanel({ fileUrl, sessionId, fileName, onOpenSidebar, onCitationClick }: LeftPanelProps) {
   if (!fileUrl) return null;
 
   return (
     <div className="h-full bg-white rounded-2xl border border-gray-200/60 shadow-lg overflow-hidden flex flex-col relative z-10">
+      {fileName && (
+        <div className="shrink-0 px-4 py-3 border-b border-gray-200/60 bg-gray-50/50">
+          <h2 className="text-sm font-semibold text-gray-800 truncate" title={fileName}>
+            {fileName}
+          </h2>
+        </div>
+      )}
       <PdfViewerComponent fileUrl={fileUrl} sessionId={sessionId} onOpenSidebar={onOpenSidebar} onCitationClick={onCitationClick} />
     </div>
   );

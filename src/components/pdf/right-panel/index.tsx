@@ -17,10 +17,10 @@ interface RightPanelProps {
   analysisData: AnalysisData | null;
   isAnalyzing?: boolean;
   sessionId?: string | null;
+  fileName?: string;
   onCitationClick?: (page: number) => void;
 }
-
-export function RightPanel({ analysisData, isAnalyzing, sessionId, onCitationClick }: RightPanelProps) {
+export function RightPanel({ analysisData, isAnalyzing, sessionId, fileName, onCitationClick }: RightPanelProps) {
   const [session, setSession] = useState<PdfSession | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [isTyping, setIsTyping] = useState(false);
@@ -115,6 +115,12 @@ export function RightPanel({ analysisData, isAnalyzing, sessionId, onCitationCli
   }
   return (
     <div className="flex flex-col h-full bg-white relative overflow-hidden">
+      {/* Fixed Header - File Name */}
+      {fileName && (
+        <header className="shrink-0 px-4 py-3 border-b border-gray-200/60 bg-gray-50/50 sticky top-0 z-10">
+          <h2 className="text-sm font-semibold text-gray-800 truncate">{fileName}</h2>
+        </header>
+      )}
       <div className="flex-1 overflow-y-auto custom-scrollbar relative">
         <div className="p-5 md:p-6 lg:p-7 w-full">
           {/* Analysis View Sections */}
@@ -136,7 +142,7 @@ export function RightPanel({ analysisData, isAnalyzing, sessionId, onCitationCli
           </div>
           
           {/* Chat Sections */}
-          <ChatTimeline messages={messages} isTyping={isTyping} />
+          <ChatTimeline messages={messages} isTyping={isTyping} onCitationClick={onCitationClick} />
           <RecommendedQuestions 
             insights={analysisData?.insights} 
             onSelectQuestion={(q) => handleSendMessage(q)} 
