@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import Draggable from 'react-draggable';
 import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Crop, X, Sparkles, GripHorizontal, Send, Menu } from 'lucide-react';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { store, type Annotation } from '@/lib/store';
+import { useAppStore } from '@/lib/app-store';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
 
@@ -26,6 +27,8 @@ interface PdfViewerProps {
 }
 
 export function PdfViewer({ fileUrl, sessionId, targetPageNumber, onOpenSidebar, onCitationClick }: PdfViewerProps) {
+  const [documentFile, setDocumentFile] = useState<string | { data: Uint8Array } | null>(null);
+  const [documentError, setDocumentError] = useState<string | null>(null);
   const [numPages, setNumPages] = useState<number>(0);
   const [pageNumber, setPageNumber] = useState(1);
   const [pageInput, setPageInput] = useState("1");
@@ -35,7 +38,12 @@ export function PdfViewer({ fileUrl, sessionId, targetPageNumber, onOpenSidebar,
   const [isCapturing, setIsCapturing] = useState(false);
   const [startPos, setStartPos] = useState<{x: number, y: number} | null>(null);
   const [currentPos, setCurrentPos] = useState<{x: number, y: number} | null>(null);
-  const [annotations, setAnnotations] = useState<Annotation[]>([]);
+  const annotationsBySession = useAppStore((s) => s.annotationsBySession);
+  const annotations = useMemo(
+    () => (sessionId ? annotationsBySession[sessionId] ?? [] : []),
+    [annotationsBySession, sessionId]
+  );
+  const setAnnotationsForSession = useAppStore((s) => s.setAnnotationsForSession);
   
   const pageContainerRef = useRef<HTMLDivElement>(null);
 
@@ -45,33 +53,72 @@ export function PdfViewer({ fileUrl, sessionId, targetPageNumber, onOpenSidebar,
     setPageInput("1");
   }
 
-  const moveToPage = (nextPage: number) => {
+  useEffect(() => {
+    let cancelled = false;
+
+    const prepareDocumentFile = async () => {
+      if (!fileUrl) {
+        setDocumentFile(null);
+        return;
+      }
+
+      setDocumentError(null);
+
+      if (!fileUrl.startsWith("blob:")) {
+        setDocumentFile(fileUrl);
+        return;
+      }
+
+      try {
+        const response = await fetch(fileUrl);
+        if (!response.ok) {
+          throw new Error(`PDF fetch failed (${response.status})`);
+        }
+
+        const arrayBuffer = await response.arrayBuffer();
+        if (cancelled) return;
+
+        setDocumentFile({ data: new Uint8Array(arrayBuffer) });
+      } catch (error) {
+        if (cancelled) return;
+
+        setDocumentFile(fileUrl);
+        setDocumentError(error instanceof Error ? error.message : "PDF 파일을 불러오지 못했습니다.");
+      }
+    };
+
+    void prepareDocumentFile();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [fileUrl]);
+
+  const moveToPage = useCallback((nextPage: number) => {
     const maxPage = numPages > 0 ? numPages : 1;
     const clamped = Math.min(Math.max(nextPage, 1), maxPage);
     setPageNumber(clamped);
     setPageInput(String(clamped));
-  };
+  }, [numPages]);
 
   useEffect(() => {
     if (typeof targetPageNumber !== "number") return;
     if (numPages <= 0) return;
     moveToPage(targetPageNumber);
-  }, [targetPageNumber, numPages]);
+  }, [targetPageNumber, numPages, moveToPage]);
 
   // Load annotations from session
   useEffect(() => {
     if (sessionId) {
       store.getSession(sessionId).then(session => {
         if (session && session.annotations) {
-          setAnnotations(session.annotations);
+          setAnnotationsForSession(sessionId, session.annotations);
         } else {
-          setAnnotations([]);
+          setAnnotationsForSession(sessionId, []);
         }
       });
-    } else {
-      setAnnotations([]);
     }
-  }, [sessionId]);
+  }, [sessionId, setAnnotationsForSession]);
 
   // Intercept Ctrl+Scroll for zooming PDF instead of browser zoom
   useEffect(() => {
@@ -102,7 +149,9 @@ export function PdfViewer({ fileUrl, sessionId, targetPageNumber, onOpenSidebar,
   }, []);
 
   const saveAnnotationsToStore = async (newAnnots: Annotation[]) => {
-    setAnnotations(newAnnots);
+    if (sessionId) {
+      setAnnotationsForSession(sessionId, newAnnots);
+    }
     if (!sessionId) return;
     const session = await store.getSession(sessionId);
     if (session) {
@@ -285,10 +334,24 @@ export function PdfViewer({ fileUrl, sessionId, targetPageNumber, onOpenSidebar,
       
       <div className="flex-1 overflow-auto p-4 custom-scrollbar bg-gray-100/50 relative">
         <div className="max-w-fit mx-auto min-w-[700px] w-fit flex justify-center pb-12">
+          {documentError && (
+            <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              PDF 로딩 중 경고: {documentError}
+            </div>
+          )}
+
+          {!documentFile ? (
+            <div className="flex items-center justify-center p-12">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            </div>
+          ) : (
           <Document
-            file={fileUrl}
+            file={documentFile}
             options={documentOptions}
             onLoadSuccess={onDocumentLoadSuccess}
+            onLoadError={(error) => {
+              setDocumentError(error.message);
+            }}
             className="drop-shadow-xl"
             loading={
             <div className="flex items-center justify-center p-12">
@@ -343,6 +406,7 @@ export function PdfViewer({ fileUrl, sessionId, targetPageNumber, onOpenSidebar,
             ))}
           </div>
         </Document>
+          )}
         </div>
       </div>
     </div>

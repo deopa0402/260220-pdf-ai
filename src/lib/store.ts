@@ -1,6 +1,7 @@
 import localforage from "localforage";
 import { v4 as uuidv4 } from "uuid";
 import type { AnalysisData } from "@/components/MainApp";
+import { pdfSessionSchema } from "@/lib/analysis-schema";
 
 export interface Message {
   role: "user" | "ai";
@@ -47,8 +48,11 @@ export const store = {
     if (typeof window === "undefined") return [];
     
     const sessions: PdfSession[] = [];
-    await localforage.iterate((value: PdfSession) => {
-      sessions.push(value);
+    await localforage.iterate((value: unknown) => {
+      const parsed = pdfSessionSchema.safeParse(value);
+      if (parsed.success) {
+        sessions.push(parsed.data as PdfSession);
+      }
     });
     // Sort descending by creation time
     return sessions.sort((a, b) => b.createdAt - a.createdAt);
@@ -56,12 +60,18 @@ export const store = {
 
   async getSession(id: string): Promise<PdfSession | null> {
     if (typeof window === "undefined") return null;
-    return await localforage.getItem<PdfSession>(id);
+    const value = await localforage.getItem<unknown>(id);
+    const parsed = pdfSessionSchema.safeParse(value);
+    return parsed.success ? (parsed.data as PdfSession) : null;
   },
 
   async saveSession(session: PdfSession): Promise<void> {
     if (typeof window === "undefined") return;
-    await localforage.setItem(session.id, session);
+    const parsed = pdfSessionSchema.safeParse(session);
+    if (!parsed.success) {
+      throw new Error("Invalid session data shape");
+    }
+    await localforage.setItem(session.id, parsed.data);
   },
 
   async deleteSession(id: string): Promise<void> {

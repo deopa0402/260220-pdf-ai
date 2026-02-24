@@ -1,5 +1,7 @@
+"use client";
+
 import { MessageSquare, Trash2, Plus, X } from "lucide-react";
-import { PdfSession } from "@/lib/store";
+import type { PdfSession } from "@/lib/store";
 import { cn } from "@/lib/utils";
 
 interface SidebarProps {
@@ -17,9 +19,11 @@ export function Sidebar({ isOpen, sessions, currentSessionId, onSelect, onDelete
     <>
       {/* Overlay for mobile/tablet */}
       {isOpen && (
-        <div 
+        <button
+          type="button"
           className="fixed inset-0 bg-black/20 z-40 lg:hidden transition-opacity"
           onClick={onClose}
+          aria-label="사이드바 닫기"
         />
       )}
 
@@ -58,22 +62,31 @@ export function Sidebar({ isOpen, sessions, currentSessionId, onSelect, onDelete
               저장된 대화 내역이 없습니다.
             </div>
           ) : (
-            sessions.map(session => (
-              <div 
+            sessions.map((session) => {
+              const analysisTitle = session.analysisData?.title?.trim();
+              const displayTitle = analysisTitle && analysisTitle.length > 0 ? analysisTitle : session.fileName;
+
+              return (
+              <div
                 key={session.id}
                 className={cn(
                   "group relative flex flex-col p-3 rounded-xl border border-transparent hover:bg-gray-50 hover:border-gray-200 transition-colors cursor-pointer",
                   currentSessionId === session.id && "bg-blue-50/50 border-blue-200/60 shadow-xs"
                 )}
-                onClick={() => { onSelect(session.id); onClose(); }}
               >
-                <div className="flex items-center text-sm font-semibold text-gray-800 mb-1 truncate pr-8">
-                  <MessageSquare className={cn("w-4 h-4 mr-2 shrink-0", currentSessionId === session.id ? "text-blue-600" : "text-gray-400")} />
-                  <span className="truncate">{session.fileName}</span>
-                </div>
-                <div className="text-xs text-gray-400 ml-6">
-                  {new Date(session.createdAt).toLocaleString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                </div>
+                <button
+                  type="button"
+                  className="w-full text-left"
+                  onClick={() => { onSelect(session.id); onClose(); }}
+                >
+                  <div className="flex items-center text-sm font-semibold text-gray-800 mb-1 truncate pr-8">
+                    <MessageSquare className={cn("w-4 h-4 mr-2 shrink-0", currentSessionId === session.id ? "text-blue-600" : "text-gray-400")} />
+                    <span className="truncate" title={displayTitle}>{displayTitle}</span>
+                  </div>
+                  <div className="text-xs text-gray-400 ml-6">
+                    {new Date(session.createdAt).toLocaleString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                  </div>
+                </button>
 
                 <button
                   type="button"
@@ -88,7 +101,8 @@ export function Sidebar({ isOpen, sessions, currentSessionId, onSelect, onDelete
                   <Trash2 className="w-4 h-4" />
                 </button>
               </div>
-            ))
+              );
+            })
           )}
         </div>
       </div>

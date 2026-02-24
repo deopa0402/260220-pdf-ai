@@ -18,7 +18,7 @@ interface LeftPanelProps {
   fileUrl: string | null;
   sessionId: string | null;
   pageNumber?: number;
-  fileName?: string | null;
+  fileName?: string;
   onOpenSidebar?: () => void;
   onCitationClick?: (page: number) => void;
 }

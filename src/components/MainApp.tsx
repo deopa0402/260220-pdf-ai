@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
+import { useAppStore } from "@/lib/app-store";
 import { PdfUploader } from "./PdfUploader";
 import { Sidebar } from "./Sidebar";
 import { ApiKeyModal } from "./ApiKeyModal";
@@ -30,18 +31,26 @@ export interface AnalysisData {
 }
 
 export function MainApp({ initialSessionId }: { initialSessionId?: string }) {
-  const [fileUrl, setFileUrl] = useState<string | null>(null);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [analysisData, setAnalysisData] = useState<AnalysisData | null>(null);
-  const [pageNumber, setPageNumber] = useState(1);
-
-  // Session Data & Sidebar States
+  const fileUrl = useAppStore((s) => s.fileUrl);
+  const setFileUrl = useAppStore((s) => s.setFileUrl);
+  const isAnalyzing = useAppStore((s) => s.isAnalyzing);
+  const setIsAnalyzing = useAppStore((s) => s.setIsAnalyzing);
+  const analysisData = useAppStore((s) => s.analysisData);
+  const setAnalysisData = useAppStore((s) => s.setAnalysisData);
+  const pageNumber = useAppStore((s) => s.pageNumber);
+  const setPageNumber = useAppStore((s) => s.setPageNumber);
+  const setSessionIds = useAppStore((s) => s.setSessionIds);
+  const currentSessionId = useAppStore((s) => s.currentSessionId);
+  const setCurrentSessionId = useAppStore((s) => s.setCurrentSessionId);
+  const isSidebarOpen = useAppStore((s) => s.isSidebarOpen);
+  const setIsSidebarOpen = useAppStore((s) => s.setIsSidebarOpen);
+  const isKeyModalOpen = useAppStore((s) => s.isKeyModalOpen);
+  const setIsKeyModalOpen = useAppStore((s) => s.setIsKeyModalOpen);
+  const pendingFile = useAppStore((s) => s.pendingFile);
+  const setPendingFile = useAppStore((s) => s.setPendingFile);
+  const currentFileName = useAppStore((s) => s.currentFileName);
+  const setCurrentFileName = useAppStore((s) => s.setCurrentFileName);
   const [sessions, setSessions] = useState<PdfSession[]>([]);
-  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [isKeyModalOpen, setIsKeyModalOpen] = useState(false);
-  const [pendingFile, setPendingFile] = useState<File | null>(null);
-  const [currentFileName, setCurrentFileName] = useState<string | undefined>(undefined);
 
   // Load Sessions on Mount and Handle History Popstate
   // biome-ignore lint/correctness/useExhaustiveDependencies: initial setup only
@@ -67,9 +76,18 @@ export function MainApp({ initialSessionId }: { initialSessionId?: string }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialSessionId]);
 
+  useEffect(() => {
+    return () => {
+      if (fileUrl?.startsWith("blob:")) {
+        URL.revokeObjectURL(fileUrl);
+      }
+    };
+  }, [fileUrl]);
+
   const loadSessions = async () => {
     const data = await store.getSessions();
     setSessions(data);
+    setSessionIds(data.map(s => s.id));
   };
 
   const handleFileUpload = async (file: File) => {
@@ -110,7 +128,7 @@ export function MainApp({ initialSessionId }: { initialSessionId?: string }) {
   };
 
   const handleReset = (skipHistory = false) => {
-    if (fileUrl) {
+    if (fileUrl?.startsWith("blob:")) {
       URL.revokeObjectURL(fileUrl);
     }
     setFileUrl(null);
@@ -129,6 +147,10 @@ export function MainApp({ initialSessionId }: { initialSessionId?: string }) {
       return;
     }
     
+    if (fileUrl?.startsWith("blob:")) {
+      URL.revokeObjectURL(fileUrl);
+    }
+
     // Set UI states from session
     const blob = await fetch(`data:application/pdf;base64,${session.pdfBase64}`).then(res => res.blob());
     const restoredUrl = URL.createObjectURL(blob);
