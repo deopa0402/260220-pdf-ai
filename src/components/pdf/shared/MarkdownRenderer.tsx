@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { cloneElement, isValidElement, type ReactElement, type ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -12,6 +12,20 @@ interface MarkdownRendererProps {
   content: string;
   onCitationClick?: (page: number) => void;
 }
+
+type MarkdownNodeInfo = {
+  position?: {
+    start?: {
+      line?: number;
+      column?: number;
+    };
+  };
+};
+
+type MarkdownElementProps = {
+  children?: ReactNode;
+  node?: MarkdownNodeInfo;
+};
 
 const citationRegex = /\[(\d+)(?:p|페이지)\]/g;
 
@@ -70,12 +84,10 @@ function injectCitationBadges(
 
 export function MarkdownRenderer({ content, onCitationClick }: MarkdownRendererProps) {
   const [hoveredSentenceId, setHoveredSentenceId] = useState<string | null>(null);
-  const sentenceCounterRef = useRef(0);
-  sentenceCounterRef.current = 0;
-
-  const nextSentenceId = () => {
-    sentenceCounterRef.current += 1;
-    return `sentence-${sentenceCounterRef.current}`;
+  const getSentenceId = (node?: MarkdownNodeInfo) => {
+    const line = node?.position?.start?.line ?? 0;
+    const column = node?.position?.start?.column ?? 0;
+    return `sentence-${line}-${column}`;
   };
 
   return (
@@ -83,7 +95,7 @@ export function MarkdownRenderer({ content, onCitationClick }: MarkdownRendererP
       remarkPlugins={[remarkGfm]}
       rehypePlugins={[rehypeSanitize]}
       components={{
-        a: ({ node, ...props }) => (
+        a: ({ ...props }) => (
           <a
             target="_blank"
             rel="noopener noreferrer"
@@ -106,8 +118,8 @@ export function MarkdownRenderer({ content, onCitationClick }: MarkdownRendererP
 
           return <sup {...props}>{children}</sup>;
         },
-        p: ({ children }) => {
-          const sentenceId = nextSentenceId();
+        p: ({ children, node }: MarkdownElementProps) => {
+          const sentenceId = getSentenceId(node);
           return (
             <p
               className={cn(
@@ -125,8 +137,8 @@ export function MarkdownRenderer({ content, onCitationClick }: MarkdownRendererP
         ol: ({ children }) => (
           <ol className="list-decimal list-inside mb-3 space-y-1">{children}</ol>
         ),
-        li: ({ children }) => {
-          const sentenceId = nextSentenceId();
+        li: ({ children, node }: MarkdownElementProps) => {
+          const sentenceId = getSentenceId(node);
           return (
             <li
               className={cn(
@@ -150,9 +162,9 @@ export function MarkdownRenderer({ content, onCitationClick }: MarkdownRendererP
         strong: ({ children }) => (
           <strong className="font-bold">{children}</strong>
         ),
-        blockquote: ({ children }) => (
+        blockquote: ({ children, node }: MarkdownElementProps) => (
           <blockquote className="border-l-4 border-gray-300 pl-3 italic my-3 text-gray-700">
-            {injectCitationBadges(children, onCitationClick, nextSentenceId(), setHoveredSentenceId)}
+            {injectCitationBadges(children, onCitationClick, getSentenceId(node), setHoveredSentenceId)}
           </blockquote>
         ),
         code: ({ className, children, ...props }) => {
