@@ -11,6 +11,34 @@ import type { AnalysisData } from "../../MainApp";
 import { RightPanelHeader } from "./RightPanelHeader";
 import { RightPanelAnalysis } from "./RightPanelAnalysis";
 
+const buildContextText = (analysisData: AnalysisData | null) => {
+  if (!analysisData) return "";
+
+  const summaryLines = analysisData.summaries.flatMap(item => item.lines?.map((line) => line.text) ?? []);
+  const keywordText = analysisData.keywords?.length
+    ? `\n- 키워드: ${analysisData.keywords.join(", ")}`
+    : "";
+  const summaryText = summaryLines.length
+    ? `\n- 요약: ${summaryLines.slice(0, 8).join(" | ")}`
+    : "";
+
+  const issueLines = Array.isArray(analysisData.issues)
+    ? analysisData.issues.map((item) => item.text).filter(Boolean)
+    : typeof analysisData.issues === "string"
+      ? [analysisData.issues]
+      : [];
+  const issueText = issueLines.length
+    ? `\n- 핵심 체크포인트: ${issueLines.slice(0, 5).join(" | ")}`
+    : "";
+
+  return [
+    `문서 제목: ${analysisData.title}`,
+    summaryText,
+    keywordText,
+    issueText,
+  ].join("\n").trim();
+};
+
 interface RightPanelProps {
   analysisData: AnalysisData | null;
   isAnalyzing?: boolean;
@@ -22,6 +50,7 @@ interface RightPanelProps {
 export function RightPanel({ analysisData, isAnalyzing, sessionId, fileName, onCitationClick }: RightPanelProps) {
   const [isTyping, setIsTyping] = useState(false);
   const chatBottomRef = useRef<HTMLDivElement>(null);
+  const firstTurnDoneBySessionRef = useRef(false);
   const chatMessagesBySession = useAppStore((s) => s.chatMessagesBySession);
   const currentFileName = useAppStore((s) => s.currentFileName);
   const messages = useMemo(
@@ -29,6 +58,10 @@ export function RightPanel({ analysisData, isAnalyzing, sessionId, fileName, onC
     [chatMessagesBySession, sessionId]
   );
   const setChatMessagesForSession = useAppStore((s) => s.setChatMessagesForSession);
+
+  useEffect(() => {
+    firstTurnDoneBySessionRef.current = Boolean(sessionId && messages.some((message) => message.role === "user"));
+  }, [sessionId, messages]);
 
   useEffect(() => {
     chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -55,8 +88,13 @@ export function RightPanel({ analysisData, isAnalyzing, sessionId, fileName, onC
         systemInstruction: "당신은 문서 분석 AI 챗봇입니다. 제공된 문서와 사용자의 이전 대화 내역에 기반하여 사용자의 질문에 정확한 답변을 제공하세요. 답변할 때 출처를 [Np] 형식으로 포함하세요. 여러 페이지는 [1p],[2p]처럼 표기하세요."
       });
 
-      const historyParts = newMessages.map(m => `[${m.role === "user" ? "사용자" : "AI"}]: ${m.content}`).join("\n\n");
-      const prompt = `이전 대화 내역:\n${historyParts}\n\n위 문서를 기반으로 답변해주세요.`;
+      const isFirstTurn = !firstTurnDoneBySessionRef.current;
+      const historyParts = newMessages
+        .map((m) => `[${m.role === "user" ? "사용자" : "AI"}]: ${m.content}`)
+        .join("\n\n");
+
+      const contextText = isFirstTurn ? buildContextText(analysisData) : "";
+      const prompt = `${contextText ? `${contextText}\n\n` : ""}이전 대화 내역:\n${historyParts}\n\n위 문서를 기반으로 답변해주세요.`;
 
       if (!sessionId) {
         throw new Error("세션 정보를 찾을 수 없습니다.");
@@ -69,34 +107,50 @@ export function RightPanel({ analysisData, isAnalyzing, sessionId, fileName, onC
         throw new Error("PDF 데이터를 불러오지 못했습니다. 문서를 다시 선택해주세요.");
       }
 
-      const result = await model.generateContentStream([
-        prompt,
-        {
-          inlineData: {
-            data: pdfBase64,
-            mimeType: "application/pdf"
-          }
-        }
-      ]);
+      const contents = isFirstTurn
+        ? [
+            prompt,
+            {
+              inlineData: {
+                data: pdfBase64,
+                mimeType: "application/pdf",
+              },
+            },
+          ]
+            : [
+                prompt,
+              ];
+      firstTurnDoneBySessionRef.current = true;
+
+      const result = await model.generateContentStream(contents);
 
       let botResponse = "";
       if (sessionId) {
         setChatMessagesForSession(sessionId, [...newMessages, { role: "ai" as const, content: "" }]);
       }
       
+      let frameId: number | null = null;
+      const flush = () => {
+        if (!sessionId) return;
+        const updated = [...newMessages, { role: "ai" as const, content: botResponse }];
+        setChatMessagesForSession(sessionId, updated);
+        frameId = null;
+      };
+
       for await (const chunk of result.stream) {
         const chunkText = chunk.text();
+        if (!chunkText) continue;
+
         botResponse += chunkText;
-        if (sessionId) {
-          const updated = [...newMessages, { role: "ai" as const, content: botResponse }];
-          setChatMessagesForSession(sessionId, updated);
+        if (!frameId && sessionId) {
+          frameId = requestAnimationFrame(flush);
         }
       }
 
-      if (sessionId) {
-        setChatMessagesForSession(sessionId, [...newMessages, { role: "ai" as const, content: botResponse }]);
+      if (frameId !== null) {
+        cancelAnimationFrame(frameId);
       }
-
+      flush();
     } catch(err) {
       console.error(err);
       if (sessionId) {
@@ -120,7 +174,7 @@ export function RightPanel({ analysisData, isAnalyzing, sessionId, fileName, onC
 
   return (
     <div className="flex flex-col h-full bg-white relative overflow-hidden">
-      <RightPanelHeader fileName={currentFileName} />
+      <RightPanelHeader fileName={fileName || currentFileName} />
       <div className="flex-1 overflow-y-auto custom-scrollbar relative">
         <div className="p-5 md:p-6 lg:p-7 w-full">
           {analysisData && (
