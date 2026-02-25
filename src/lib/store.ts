@@ -7,12 +7,14 @@ export interface Message {
   role: "user" | "ai";
   content: string;
   citations?: number[];
+  generatedImageDataUrl?: string;
 }
 
 export interface AnnotationMessage {
   role: "user" | "ai";
   content: string;
   citations?: number[];
+  generatedImageDataUrl?: string;
 }
 
 export interface Annotation {

@@ -24,6 +24,7 @@ export const messageSchema = z.object({
   role: z.enum(["user", "ai"]),
   content: z.string(),
   citations: z.array(z.number().int().positive()).optional(),
+  generatedImageDataUrl: z.string().optional(),
 });
 
 export const annotationSchema = z.object({
