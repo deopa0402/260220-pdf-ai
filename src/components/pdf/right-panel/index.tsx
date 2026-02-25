@@ -64,8 +64,9 @@ export function RightPanel({ analysisData, isAnalyzing, sessionId, fileName, onC
   }, [sessionId, messages]);
 
   useEffect(() => {
-    chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  });
+    if (messages.length === 0 && !isTyping) return;
+    chatBottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages.length, isTyping]);
 
   const handleSendMessage = async (content: string) => {
     if (!content.trim() || isTyping) return;
