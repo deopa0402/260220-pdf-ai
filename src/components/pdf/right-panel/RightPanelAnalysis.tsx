@@ -15,7 +15,7 @@ export function RightPanelAnalysis({ analysisData, onCitationClick }: RightPanel
       <Keywords keywords={analysisData.keywords} />
       <ThreeLineSummary summary={analysisData.summaries[0]} onCitationClick={onCitationClick} />
       <DetailedSummary summary={analysisData.summaries[1]} onCitationClick={onCitationClick} />
-      <CheckPoints issues={analysisData.issues} onCitationClick={onCitationClick} />
+      {/* <CheckPoints issues={analysisData.issues} onCitationClick={onCitationClick} /> */}
     </>
   );
 }

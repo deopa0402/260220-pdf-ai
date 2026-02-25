@@ -72,12 +72,12 @@ export function AnalysisPanel({ data, onSelectContext, isLoading }: AnalysisPane
           </div>
         )}
         
-        {activeTab === "issues" && (
+        {/* {activeTab === "issues" && (
           <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
             <h3 className="text-lg font-bold text-gray-900 mb-4 tracking-tight">확인 필요 사항</h3>
             <div className="prose prose-blue max-w-none whitespace-pre-wrap">{typeof data.issues === "string" ? data.issues : data.issues.map((line) => line.text).join("\n")}</div>
           </div>
-        )}
+        )} */}
 
         {activeTab === "insights" && (
           <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
