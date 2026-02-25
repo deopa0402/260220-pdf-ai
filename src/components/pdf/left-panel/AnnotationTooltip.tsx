@@ -4,6 +4,7 @@ import { useRef, useState, useEffect, useCallback } from 'react';
 import Draggable from 'react-draggable';
 import { X, Sparkles, GripHorizontal, Send } from 'lucide-react';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenAI } from '@google/genai';
 import { type Annotation } from '@/lib/store';
 import type { AnalysisData } from '@/components/MainApp';
 
@@ -105,38 +106,64 @@ export function AnnotationTooltip({
           ? `사용자 요청: ${content}\n\n위 요청에 맞는 이미지를 1장 생성해줘. 선택 영역 이미지는 참고 맥락으로만 사용하고, 이전 대화의 제한 문구는 따르지 말고 새 이미지를 만들어줘.`
           : `이전 대화:\n${historyParts}\n\n사용자: ${content}\n\n위 이미지와 이전 대화를 기반으로 한국어로 간결하고 명확하게 답변해줘.`;
 
-      const base64Data = annotation.imageOriginBase64.split(",")[1];
-      const mimeType = annotation.imageOriginBase64.split(";")[0].split(":")[1];
-
       if (isImageRequest) {
-        const imageModel = genAI.getGenerativeModel({
-          model: "gemini-2.5-flash-image",
-        });
-        const response = await imageModel.generateContent([
+        const imageGenAI = new GoogleGenAI({ apiKey });
+        const imageRequest = {
           prompt,
-          {
-            inlineData: { data: base64Data, mimeType }
+          config: {
+            numberOfImages: 1,
+            outputMimeType: "image/png",
+            aspectRatio: "1:1",
+          },
+        };
+
+        let usedFallbackModel = false;
+        let imageResponse: Awaited<ReturnType<typeof imageGenAI.models.generateImages>>;
+
+        try {
+          imageResponse = await imageGenAI.models.generateImages({
+            model: "imagen-4.0-ultra-generate-001",
+            ...imageRequest,
+          });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "";
+          const isUltraUnavailable = message.includes("not found") || message.includes("not supported");
+          if (!isUltraUnavailable) {
+            throw error;
           }
-        ]);
+          usedFallbackModel = true;
+          imageResponse = await imageGenAI.models.generateImages({
+            model: "imagen-4.0-generate-001",
+            ...imageRequest,
+          });
+        }
 
-        const parts = response.response.candidates?.flatMap((candidate) => candidate.content?.parts ?? []) ?? [];
-        const textResponse = parts
-          .map((part) => part.text?.trim())
-          .filter((part): part is string => Boolean(part))
-          .join("\n");
+        if (!imageResponse.generatedImages?.[0]?.image?.imageBytes) {
+          usedFallbackModel = true;
+          imageResponse = await imageGenAI.models.generateImages({
+            model: "imagen-4.0-generate-001",
+            ...imageRequest,
+          });
+        }
 
-        const imageDataPart = parts.find((part) => part.inlineData?.data && part.inlineData?.mimeType?.startsWith("image/"));
-        const generatedImageDataUrl = imageDataPart?.inlineData
-          ? `data:${imageDataPart.inlineData.mimeType};base64,${imageDataPart.inlineData.data}`
+        const generatedImage = imageResponse.generatedImages?.[0]?.image;
+        const generatedImageDataUrl = generatedImage?.imageBytes
+          ? `data:${generatedImage.mimeType || "image/png"};base64,${generatedImage.imageBytes}`
           : undefined;
 
         const aiMessage = {
           role: "ai" as const,
-          content: textResponse || (generatedImageDataUrl ? "생성된 이미지를 확인해주세요." : "이미지를 생성하지 못했습니다. 다시 시도해주세요."),
+          content: generatedImageDataUrl
+            ? usedFallbackModel
+              ? "Ultra 모델이 사용 불가하여 기본 Imagen 모델로 생성했습니다."
+              : "생성된 이미지를 확인해주세요."
+            : "이미지를 생성하지 못했습니다. 다시 시도해주세요.",
           generatedImageDataUrl,
         };
         onUpdate({ ...annotation, messages: [...currentMessages, aiMessage] });
       } else {
+        const base64Data = annotation.imageOriginBase64.split(",")[1];
+        const mimeType = annotation.imageOriginBase64.split(";")[0].split(":")[1];
         const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
         const result = await model.generateContentStream([
           prompt,
