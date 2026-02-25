@@ -1,8 +1,9 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import type { AnalysisData } from "@/components/MainApp";
 
-const PdfViewerComponent = dynamic(() => import("../../PdfViewer").then((mod) => mod.PdfViewer), {
+const PdfViewerComponent = dynamic(() => import("./PdfViewer").then((mod) => mod.PdfViewer), {
   ssr: false,
   loading: () => (
     <div className="flex items-center justify-center p-12 h-full w-full bg-gray-50/50 rounded-2xl border border-gray-200/60">
@@ -18,24 +19,24 @@ interface LeftPanelProps {
   fileUrl: string | null;
   sessionId: string | null;
   pageNumber?: number;
-  fileName?: string;
+  analysisData?: AnalysisData | null;
   onOpenSidebar?: () => void;
-  onCitationClick?: (page: number) => void;
+  onPageChange?: (page: number) => void;
 }
 
-export function LeftPanel({ fileUrl, sessionId, pageNumber, fileName, onOpenSidebar, onCitationClick }: LeftPanelProps) {
+export function LeftPanel({ fileUrl, sessionId, pageNumber, analysisData, onOpenSidebar, onPageChange }: LeftPanelProps) {
   if (!fileUrl) return null;
 
   return (
     <div className="h-full bg-white rounded-2xl border border-gray-200/60 shadow-lg overflow-hidden flex flex-col relative z-10">
-      {fileName && (
-        <div className="shrink-0 px-4 py-3 border-b border-gray-200/60 bg-gray-50/50">
-          <h2 className="text-sm font-semibold text-gray-800 truncate" title={fileName}>
-            {fileName}
-          </h2>
-        </div>
-      )}
-      <PdfViewerComponent fileUrl={fileUrl} sessionId={sessionId} targetPageNumber={pageNumber} onOpenSidebar={onOpenSidebar} onCitationClick={onCitationClick} />
+      <PdfViewerComponent
+        fileUrl={fileUrl}
+        sessionId={sessionId}
+        targetPageNumber={pageNumber}
+        analysisData={analysisData}
+        onOpenSidebar={onOpenSidebar}
+        onPageChange={onPageChange}
+      />
     </div>
   );
 }

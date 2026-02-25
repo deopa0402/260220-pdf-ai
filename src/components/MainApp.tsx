@@ -442,9 +442,9 @@ export function MainApp({ initialSessionId }: { initialSessionId?: string }) {
                   fileUrl={fileUrl}
                   sessionId={currentSessionId}
                   pageNumber={pageNumber}
-                  fileName={panelTitle}
+                  analysisData={analysisData}
                   onOpenSidebar={isSessionPage ? () => setIsSidebarOpen(true) : undefined}
-                  onCitationClick={handleCitationClick}
+                  onPageChange={setPageNumber}
                 />
               </Panel>
               
