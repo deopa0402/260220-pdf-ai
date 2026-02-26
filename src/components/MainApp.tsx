@@ -5,7 +5,7 @@ import { useAppStore } from "@/lib/app-store";
 import { PdfUploader } from "./PdfUploader";
 import { Sidebar } from "./Sidebar";
 import { ApiKeyModal } from "./ApiKeyModal";
-import { Sparkles, ArrowLeft, Menu, Key } from "lucide-react";
+import { Sparkles, ArrowLeft, Menu } from "lucide-react";
 import { store, PdfSession } from "@/lib/store";
 import { LeftPanel } from "./pdf/left-panel";
 import { RightPanel } from "./pdf/right-panel";
@@ -203,7 +203,7 @@ export function MainApp({ initialSessionId }: { initialSessionId?: string }) {
     }
   ],
   "keywords": ["키워드1", "키워드2", "키워드3"],
-  "insights": "문서 내 수치나 사실에서 바로 답을 찾을 수 있는 짧은 질문 3가지 (형식: 1. 질문? \\n 2. 질문? \\n 3. 질문?)",
+  "insights": "문서 내 수치나 사실에서 바로 답을 찾을 수 있는 짧은 질문 3가지 (각 질문은 줄바꿈으로만 구분, 번호/불릿 없이 질문 문장만 작성)",
   "issues": [
     { "text": "논리적으로 확인이 필요한 사항", "pages": [6] },
     { "text": "휴먼에러 가능성이 있는 표현", "pages": [7, 8] }
@@ -213,7 +213,7 @@ export function MainApp({ initialSessionId }: { initialSessionId?: string }) {
 작성 가이드:
 1. title: 문서 전체를 대표하는 짧고 명확한 제목을 반드시 작성하세요.
 2. insights: 배경지식이 필요한 깊은 분석 대신, 본문 내 데이터로 즉각 답변 가능한 '팩트 체크형' 질문을 작성하세요. 
-3. 간결성: 질문은 최대한 짧고 명확하게 한 줄로 구성하세요.
+3. insights 형식: 질문은 정확히 3개만 작성하고, 각 질문은 한 줄에 하나씩 작성하세요. 번호(1.,2.,3.)나 불릿(-,*)은 사용하지 마세요.
 4. 3줄 요약은 summaries[0].lines에 정확히 3개 항목을 넣으세요. 각 항목은 text/pages를 모두 가져야 합니다.
 5. pages는 숫자 배열만 허용합니다. 예: [1] 또는 [1,2]. 문자열/대괄호 텍스트 금지.
 6. summaries[1]과 issues도 동일하게 text/pages 구조로 작성하세요.
@@ -241,14 +241,14 @@ export function MainApp({ initialSessionId }: { initialSessionId?: string }) {
 
       if (!res.ok) {
         const errText = await res.text();
-        console.error("Gemini API Error:", res.status, errText);
-        throw new Error(`Gemini API error: ${res.statusText}`);
+        console.error("AI API Error:", res.status, errText);
+        throw new Error(`AI API error: ${res.statusText}`);
       }
 
       const resData = await res.json();
       const responseText = resData.candidates?.[0]?.content?.parts?.[0]?.text;
       
-      if (!responseText) throw new Error("No response from Gemini API");
+      if (!responseText) throw new Error("No response from AI API");
 
       const data = JSON.parse(responseText) as Partial<AnalysisData> & {
         title?: unknown;
@@ -382,23 +382,11 @@ export function MainApp({ initialSessionId }: { initialSessionId?: string }) {
               <Sparkles className="w-5 h-5 text-white" />
             </div>
             <h1 className="text-xl font-bold bg-linear-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent tracking-tight">
-              Gemini <span className="text-blue-600 font-extrabold">PDF AI</span>
+              <span className="text-blue-600 font-extrabold">PDF AI</span> Assistant
             </h1>
           </div>
 
           <div className="ml-auto flex items-center gap-2">
-            {!fileUrl && (
-              <button
-                type="button"
-                onClick={() => setIsKeyModalOpen(true)}
-                className="text-sm font-medium text-gray-600 hover:text-blue-600 bg-white hover:bg-blue-50 border border-gray-200 hover:border-blue-200 rounded-lg px-3 py-2 transition-colors flex items-center shadow-sm"
-                title="API Key 설정"
-              >
-                <Key className="w-4 h-4 mr-0 sm:mr-2" />
-                <span className="hidden sm:inline">API Key 설정</span>
-              </button>
-            )}
-
             {fileUrl && (
               <button
                 type="button"
@@ -419,14 +407,14 @@ export function MainApp({ initialSessionId }: { initialSessionId?: string }) {
             <div className="w-full">
               <div className="text-center mb-12">
                 <div className="inline-flex items-center justify-center bg-blue-100/50 text-blue-700 rounded-full px-4 py-1.5 mb-6 text-sm font-semibold tracking-wide border border-blue-200 shadow-sm">
-                  Powered by Google Gemini
+                  AI 문서 분석 도우미
                 </div>
                 <h2 className="text-4xl sm:text-5xl font-extrabold text-gray-900 mb-6 tracking-tight leading-tight">
-                  문서를 업로드하고 <br className="hidden sm:block" />
-                  <span className="bg-linear-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">AI 인사이트</span>를 얻으세요
+                  PDF를 업로드하고 <br className="hidden sm:block" />
+                  <span className="bg-linear-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">핵심 내용</span>을 빠르게 확인하세요
                 </h2>
                 <p className="text-lg text-gray-500 font-medium max-w-2xl mx-auto">
-                  복잡하고 긴 PDF 문서를 빠르게 요약하고, 핵심 키워드를 파악하며 자유롭게 대화할 수 있습니다.
+                  복잡한 문서를 요약하고 근거 페이지와 함께 바로 질문할 수 있습니다.
                 </p>
               </div>
               <div className="max-w-3xl mx-auto px-4">
