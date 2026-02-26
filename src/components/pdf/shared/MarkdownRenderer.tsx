@@ -29,6 +29,20 @@ type MarkdownElementProps = {
 
 const citationRegex = /\[(\d+)(?:p|페이지)\]/g;
 
+const compactCitationGroupRegex = /\[((?:\d+\s*(?:p|페이지)\s*,\s*)+\d+\s*(?:p|페이지))\]/g;
+
+function normalizeCompactCitationGroups(text: string): string {
+  return text.replace(compactCitationGroupRegex, (_whole, group) => {
+    const tokens = String(group)
+      .split(",")
+      .map((token) => token.trim())
+      .filter((token) => /^\d+\s*(?:p|페이지)$/.test(token));
+
+    if (tokens.length <= 1) return `[${group}]`;
+    return tokens.map((token) => `[${token}]`).join(",");
+  });
+}
+
 function injectCitationBadges(
   node: ReactNode,
   onCitationClick?: (page: number) => void,
@@ -36,13 +50,14 @@ function injectCitationBadges(
   onHoverSentence?: (sentenceId: string | null) => void
 ): ReactNode {
   if (typeof node === "string") {
+    const normalizedNode = normalizeCompactCitationGroups(node);
     const pieces: ReactNode[] = [];
     let lastIndex = 0;
     citationRegex.lastIndex = 0;
-    let match = citationRegex.exec(node);
+    let match = citationRegex.exec(normalizedNode);
     while (match !== null) {
       if (match.index > lastIndex) {
-        pieces.push(node.slice(lastIndex, match.index));
+        pieces.push(normalizedNode.slice(lastIndex, match.index));
       }
 
       const page = Number.parseInt(match[1], 10);
@@ -57,14 +72,14 @@ function injectCitationBadges(
       );
 
       lastIndex = match.index + match[0].length;
-      match = citationRegex.exec(node);
+      match = citationRegex.exec(normalizedNode);
     }
 
-    if (lastIndex < node.length) {
-      pieces.push(node.slice(lastIndex));
+    if (lastIndex < normalizedNode.length) {
+      pieces.push(normalizedNode.slice(lastIndex));
     }
 
-    return pieces.length > 0 ? pieces : node;
+    return pieces.length > 0 ? pieces : normalizedNode;
   }
 
   if (Array.isArray(node)) {

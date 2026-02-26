@@ -5,6 +5,49 @@ interface Props {
   onSelectQuestion: (q: string) => void;
 }
 
+const cleanQuestion = (value: string): string =>
+  value
+    .replace(/^\s*(?:[-*•]\s*|\d+[.)]\s*)/, "")
+    .replace(/^['"`\s]+|['"`\s]+$/g, "")
+    .trim();
+
+const parseQuestions = (insights?: string): string[] => {
+  if (!insights) return [];
+  const raw = insights.trim();
+  if (!raw) return [];
+
+  if (raw.startsWith("[") && raw.endsWith("]")) {
+    let parsed: unknown = null;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      parsed = null;
+    }
+
+    if (Array.isArray(parsed)) {
+      return parsed
+        .filter((item): item is string => typeof item === "string")
+        .map(cleanQuestion)
+        .filter(Boolean)
+        .slice(0, 3);
+    }
+  }
+
+  const segments = raw.includes("\n")
+    ? raw.split("\n")
+    : raw.split(/\s+(?=\d+[.)]\s*)|[;|]/);
+
+  const unique: string[] = [];
+  for (const segment of segments) {
+    const question = cleanQuestion(segment);
+    if (!question) continue;
+    if (!unique.includes(question)) unique.push(question);
+    if (unique.length >= 3) break;
+  }
+
+  return unique;
+};
+
 export function RecommendedQuestions({ insights, onSelectQuestion }: Props) {
   const defaultQuestions = [
     "비용 최적화 구조에 대해 더 설명해줘",
@@ -12,9 +55,8 @@ export function RecommendedQuestions({ insights, onSelectQuestion }: Props) {
     "최종 결론만 3줄 다이제스트해줘"
   ];
 
-  const questions = insights 
-    ? insights.split('\n').map(q => q.replace(/^\d+\.\s*/, '').trim()).filter(Boolean)
-    : defaultQuestions;
+  const questions = parseQuestions(insights);
+  const displayQuestions = questions.length > 0 ? questions : defaultQuestions;
 
   return (
     <div className="mb-2 mt-2">
@@ -22,7 +64,7 @@ export function RecommendedQuestions({ insights, onSelectQuestion }: Props) {
         <Sparkles className="w-3 h-3 mr-1" /> 추천 질문
       </div>
       <div className="flex flex-wrap gap-1.5">
-        {questions.map((q) => (
+        {displayQuestions.map((q) => (
           <button 
             key={`rec-${q}`}
             type="button"

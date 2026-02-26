@@ -86,7 +86,7 @@ export function RightPanel({ analysisData, isAnalyzing, sessionId, fileName, onC
       const genAI = new GoogleGenerativeAI(apiKey);
       const model = genAI.getGenerativeModel({ 
         model: "gemini-2.5-flash",
-        systemInstruction: "당신은 문서 분석 AI 챗봇입니다. 제공된 문서와 사용자의 이전 대화 내역에 기반하여 사용자의 질문에 정확한 답변을 제공하세요. 답변할 때 출처를 [Np] 형식으로 포함하세요. 여러 페이지는 [1p],[2p]처럼 표기하세요."
+        systemInstruction: "당신은 문서 분석 AI 챗봇입니다. 제공된 문서와 사용자의 이전 대화 내역에 기반하여 사용자의 질문에 정확한 답변을 제공하세요. 답변의 문장 끝에는 근거 페이지를 반드시 표기하세요. 단일 페이지 예시: [3p]. 다중 페이지 예시: [3p],[5p]. [1p,2p]처럼 하나의 대괄호 안에 여러 페이지를 넣지 마세요. [Np] 같은 템플릿 표기는 절대 사용하지 마세요."
       });
 
       const isFirstTurn = !firstTurnDoneBySessionRef.current;
