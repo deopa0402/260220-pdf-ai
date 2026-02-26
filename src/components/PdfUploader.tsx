@@ -47,11 +47,9 @@ export function PdfUploader({ onFileUpload, isLoading }: PdfUploaderProps) {
             <UploadCloud className="w-10 h-10" />
           </div>
           <p className="text-2xl font-bold text-gray-900">
-            {isDragActive ? "여기에 PDF 파일을 놓으세요!" : "PDF 파일을 드래그 & 드롭하세요"}
+            {isDragActive ? "여기에 PDF 파일을 놓으세요" : "PDF 파일을 업로드하세요"}
           </p>
-          <p className="text-base text-gray-500">
-            또는 버튼을 클릭하여 파일을 선택할 수 있습니다 (최대 10MB)
-          </p>
+          <p className="text-base text-gray-500">드래그 앤 드롭하거나 클릭해서 파일을 선택하세요.</p>
         </div>
       )}
     </div>

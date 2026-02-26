@@ -24,10 +24,9 @@ export function ChatPanel({ sessionId, documentContext, initialContext, onClearC
   const [isTyping, setIsTyping] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Sync messages when sessionId changes
   useEffect(() => {
     setMessages(savedMessages);
-  }, [sessionId]);
+  }, [savedMessages]);
 
   const appendUserMessage = useCallback((text: string) => {
     setMessages(prev => {
@@ -38,7 +37,7 @@ export function ChatPanel({ sessionId, documentContext, initialContext, onClearC
     setIsTyping(true);
   }, [onUpdateMessages]);
 
-  const fetchGeminiResponse = useCallback(async (chatMessages: Message[]) => {
+  const fetchAiResponse = useCallback(async (chatMessages: Message[]) => {
     const apiKey = localStorage.getItem("gemini_api_key");
     if (!apiKey) throw new Error("API Key가 설정되지 않았습니다. 우측 상단에서 키를 입력해주세요.");
 
@@ -82,11 +81,11 @@ Answer in a friendly, conversational Korean tone.`;
       body: JSON.stringify(payload),
     });
 
-    if (!res.ok) throw new Error("Google Gemini API error");
+    if (!res.ok) throw new Error("AI API error");
     
     const data = await res.json();
     const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!responseText) throw new Error("No text response from Gemini");
+    if (!responseText) throw new Error("No text response from AI");
     
     return responseText;
   }, [documentContext]);
@@ -99,7 +98,7 @@ Answer in a friendly, conversational Korean tone.`;
       const sendInitial = async () => {
         setIsTyping(true);
         try {
-          const responseText = await fetchGeminiResponse([{ role: "user", content: initialContext }]);
+          const responseText = await fetchAiResponse([{ role: "user", content: initialContext }]);
           setMessages(prev => {
             const updated: Message[] = [...prev, { role: "ai", content: responseText }];
             onUpdateMessages?.(updated);
@@ -120,7 +119,7 @@ Answer in a friendly, conversational Korean tone.`;
       
       sendInitial();
     }
-  }, [initialContext, appendUserMessage, onClearContext, onUpdateMessages, fetchGeminiResponse]);
+  }, [initialContext, appendUserMessage, onClearContext, onUpdateMessages, fetchAiResponse]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -137,7 +136,7 @@ Answer in a friendly, conversational Korean tone.`;
 
     try {
       const chatHistory = [...messages, { role: "user" as const, content: userMessage }];
-      const responseText = await fetchGeminiResponse(chatHistory);
+      const responseText = await fetchAiResponse(chatHistory);
       
       setMessages(prev => {
         const updated: Message[] = [...prev, { role: "ai", content: responseText }];
@@ -166,13 +165,13 @@ Answer in a friendly, conversational Korean tone.`;
         </div>
         <div className="flex items-center text-xs text-blue-600 font-medium bg-blue-50 px-2 py-1 rounded-full border border-blue-100">
           <Sparkles className="w-3 h-3 mr-1" />
-          Gemini 활성화
+          AI 활성화
         </div>
       </div>
       
       <div className="flex-1 overflow-y-auto p-5 space-y-5 custom-scrollbar bg-gray-50/30" ref={scrollRef}>
-        {messages.map((msg, i) => (
-          <div key={`msg-${i}`} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+        {messages.map((msg) => (
+          <div key={`${msg.role}-${msg.content}`} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
             {msg.role === "ai" && (
               <div className="w-8 h-8 rounded-full bg-linear-to-br from-blue-100 to-blue-200 border border-blue-300 flex items-center justify-center mr-3 mt-1 shadow-sm shrink-0">
                 <Bot className="w-4 h-4 text-blue-700" />

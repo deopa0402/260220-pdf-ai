@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Gemini PDF Analyzer",
-  description: "Analyze and chat with your PDFs using Gemini AI",
+  title: "PDF AI Analyzer",
+  description: "Analyze and chat with your PDF documents",
 };
 
 export default function RootLayout({
