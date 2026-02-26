@@ -1,5 +1,5 @@
 import { Bot, Sparkles } from "lucide-react";
-import { MarkdownRenderer } from "../shared/MarkdownRenderer";
+import { MarkdownRenderer } from "../../shared/MarkdownRenderer";
 
 interface Message {
   role: "user" | "ai";

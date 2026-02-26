@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 import { AlignLeft } from "lucide-react";
-import type { ReferenceLine, SummaryVariant } from "../../MainApp";
-import { MarkdownRenderer } from "../shared/MarkdownRenderer";
-import { CitationBadge } from "../shared/CitationBadge";
+import type { ReferenceLine, SummaryVariant } from "../../../MainApp";
+import { MarkdownRenderer } from "../../shared/MarkdownRenderer";
+import { CitationBadge } from "../../shared/CitationBadge";
 
 interface Props {
   summary?: SummaryVariant;

@@ -1,4 +1,4 @@
-import type { AnalysisData } from "../../MainApp";
+import type { AnalysisData } from "../../../MainApp";
 import { CheckPoints } from "./CheckPoints";
 import { DetailedSummary } from "./DetailedSummary";
 import { Keywords } from "./Keywords";

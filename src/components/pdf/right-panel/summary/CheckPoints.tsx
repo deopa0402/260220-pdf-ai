@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 import { AlertTriangle } from "lucide-react";
-import type { ReferenceLine } from "../../MainApp";
-import { MarkdownRenderer } from "../shared/MarkdownRenderer";
-import { CitationBadge } from "../shared/CitationBadge";
+import type { ReferenceLine } from "../../../MainApp";
+import { MarkdownRenderer } from "../../shared/MarkdownRenderer";
+import { CitationBadge } from "../../shared/CitationBadge";
 
 interface Props {
   issues?: string | ReferenceLine[];
