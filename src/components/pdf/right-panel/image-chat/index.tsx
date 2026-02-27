@@ -94,9 +94,9 @@ export function ImageChatPanel({ sessionId }: ImageChatPanelProps) {
 
       if (isImageRequest) {
         const imageModel = genAI.getGenerativeModel({ model: "gemini-2.5-flash-image" });
-        const imagePrompt = inlineData
-          ? `사용자 요청: ${userContent}\n\n업로드된 이미지를 참고해 인포그래픽/편집 결과 이미지를 생성해줘.`
-          : `사용자 요청: ${userContent}\n\n인포그래픽 스타일 결과 이미지를 생성해줘.`;
+        const imagePrompt = history
+          .map((m) => `[${m.role === "user" ? "사용자" : "AI"}] ${m.content}`)
+          .join("\n\n");
 
         const imageResult = await imageModel.generateContent(inlineData ? [imagePrompt, { inlineData }] : [imagePrompt]);
 
@@ -181,8 +181,10 @@ export function ImageChatPanel({ sessionId }: ImageChatPanelProps) {
         </div>
       )}
 
-      <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar p-5 md:p-6 lg:p-7 w-full flex flex-col justify-end">
-        <ImageChatTimeline messages={messages} isTyping={isTyping} onCopyImage={handleCopyImage} />
+      <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar p-5 md:p-6 lg:p-7 w-full">
+        <div className="min-h-full flex flex-col justify-end">
+          <ImageChatTimeline messages={messages} isTyping={isTyping} onCopyImage={handleCopyImage} />
+        </div>
       </div>
 
       {draftImageDataUrl && (
