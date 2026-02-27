@@ -11,11 +11,22 @@ interface ImageChatInputProps {
 export function ImageChatInput({ onSend, onPickImage, hasAttachment, disabled }: ImageChatInputProps) {
   const [input, setInput] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const handleSend = () => {
     if ((!input.trim() && !hasAttachment) || disabled) return;
     onSend(input.trim());
     setInput("");
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+    }
+  };
+
+  const adjustHeight = (value: string) => {
+    if (!textareaRef.current) return;
+    textareaRef.current.style.height = "auto";
+    textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 144)}px`;
+    if (!value) textareaRef.current.style.height = "auto";
   };
 
   return (
@@ -42,10 +53,15 @@ export function ImageChatInput({ onSend, onPickImage, hasAttachment, disabled }:
             event.currentTarget.value = "";
           }}
         />
-        <input
-          type="text"
+        <textarea
+          ref={textareaRef}
           value={input}
-          onChange={(e) => setInput(e.target.value)}
+          rows={1}
+          onChange={(e) => {
+            const next = e.target.value;
+            setInput(next);
+            adjustHeight(next);
+          }}
           onPaste={(event) => {
             const items = event.clipboardData?.items;
             if (!items) return;
@@ -61,11 +77,14 @@ export function ImageChatInput({ onSend, onPickImage, hasAttachment, disabled }:
             }
           }}
           onKeyDown={(e) => {
-            if (e.key === "Enter") handleSend();
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              handleSend();
+            }
           }}
           disabled={disabled}
           placeholder="예: 체크한 영역을 인포그래픽 스타일로 재생성해줘"
-          className="w-full flex-1 bg-transparent border-transparent rounded-xl pl-11 pr-12 py-3 text-[13.5px] outline-none text-gray-800 placeholder-gray-400 disabled:opacity-50"
+          className="w-full flex-1 bg-transparent border-transparent rounded-xl pl-11 pr-12 py-3 text-[13.5px] outline-none text-gray-800 placeholder-gray-400 disabled:opacity-50 resize-none leading-5 max-h-36 overflow-y-auto"
         />
         <button
           type="button"
