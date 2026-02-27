@@ -43,9 +43,13 @@ interface SummaryPanelProps {
   isAnalyzing?: boolean;
   sessionId?: string | null;
   onCitationClick?: (page: number) => void;
+  sharedChatConfig?: {
+    publicId: string;
+    password: string;
+  };
 }
 
-export function SummaryPanel({ analysisData, isAnalyzing, sessionId, onCitationClick }: SummaryPanelProps) {
+export function SummaryPanel({ analysisData, isAnalyzing, sessionId, onCitationClick, sharedChatConfig }: SummaryPanelProps) {
   const [isTyping, setIsTyping] = useState(false);
   const chatBottomRef = useRef<HTMLDivElement>(null);
   const firstTurnDoneBySessionRef = useRef(false);
@@ -75,6 +79,29 @@ export function SummaryPanel({ analysisData, isAnalyzing, sessionId, onCitationC
     setIsTyping(true);
 
     try {
+      if (sharedChatConfig) {
+        const response = await fetch("/api/share/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            publicId: sharedChatConfig.publicId,
+            password: sharedChatConfig.password,
+            message: content,
+            history: messages,
+          }),
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error ?? "채팅 응답을 가져오지 못했습니다.");
+        }
+
+        if (sessionId) {
+          setChatMessagesForSession(sessionId, [...newMessages, { role: "ai", content: data.answer || "응답이 없습니다." }]);
+        }
+        return;
+      }
+
       const apiKey = localStorage.getItem("gemini_api_key");
       if (!apiKey) {
         throw new Error("API 키가 없습니다. 다시 로그인해주세요.");

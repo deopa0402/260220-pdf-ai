@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.999.0",
     "@google/genai": "^1.42.0",
     "@google/generative-ai": "^0.24.1",
     "@radix-ui/react-accordion": "^1.2.12",
@@ -17,11 +18,13 @@
     "dotenv": "^17.3.1",
     "form-data": "^4.0.5",
     "framer-motion": "^12.34.2",
+    "kysely": "^0.28.11",
     "localforage": "^1.10.0",
     "lucide-react": "^0.575.0",
     "next": "16.1.6",
     "next-navigation": "^1.0.6",
     "pdfjs-dist": "^5.4.624",
+    "pg": "^8.19.0",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-draggable": "^4.5.0",
@@ -40,12 +43,14 @@
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/pdfjs-dist": "^2.10.378",
+    "@types/pg": "^8.16.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/uuid": "^11.0.0",
     "babel-plugin-react-compiler": "1.0.0",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
+    "kysely-codegen": "^0.20.0",
     "tailwindcss": "^4",
     "typescript": "^5"
   }
