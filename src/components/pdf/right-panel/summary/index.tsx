@@ -169,25 +169,27 @@ export function SummaryPanel({ analysisData, isAnalyzing, sessionId, onCitationC
   }
 
   return (
-    <>
-      <div className="p-5 md:p-6 lg:p-7 w-full">
-        <RightPanelAnalysis analysisData={analysisData} onCitationClick={onCitationClick} />
+    <div className="h-full min-h-0 flex flex-col">
+      <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar">
+        <div className="p-5 md:p-6 lg:p-7 w-full">
+          <RightPanelAnalysis analysisData={analysisData} onCitationClick={onCitationClick} />
 
-        <div className="flex items-center my-6 opacity-40">
-          <div className="flex-1 border-t border-gray-300"></div>
-          <div className="px-4 text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Q&A Chat</div>
-          <div className="flex-1 border-t border-gray-300"></div>
+          <div className="flex items-center my-6 opacity-40">
+            <div className="flex-1 border-t border-gray-300"></div>
+            <div className="px-4 text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Q&A Chat</div>
+            <div className="flex-1 border-t border-gray-300"></div>
+          </div>
+
+          <ChatTimeline messages={messages} isTyping={isTyping} onCitationClick={onCitationClick} />
+          <RecommendedQuestions
+            insights={analysisData?.insights}
+            onSelectQuestion={(q) => handleSendMessage(q)}
+          />
+          <div ref={chatBottomRef} />
         </div>
-
-        <ChatTimeline messages={messages} isTyping={isTyping} onCitationClick={onCitationClick} />
-        <RecommendedQuestions
-          insights={analysisData?.insights}
-          onSelectQuestion={(q) => handleSendMessage(q)}
-        />
-        <div ref={chatBottomRef} />
       </div>
 
       <ChatInput onSend={handleSendMessage} disabled={isTyping} />
-    </>
+    </div>
   );
 }

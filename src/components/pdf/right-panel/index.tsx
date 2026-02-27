@@ -25,7 +25,7 @@ export function RightPanel({ analysisData, isAnalyzing, sessionId, fileName, onC
       <RightPanelHeader fileName={fileName || currentFileName} />
       <RightPanelTabs activeTab={activeTab} onChange={setActiveTab} />
 
-      <div className="flex-1 overflow-y-auto custom-scrollbar relative">
+      <div className="flex-1 min-h-0 relative overflow-hidden">
         {activeTab === "summary" ? (
           <SummaryPanel
             analysisData={analysisData}
