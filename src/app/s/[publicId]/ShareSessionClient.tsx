@@ -89,7 +89,7 @@ export function ShareSessionClient({ publicId }: ShareSessionClientProps) {
             onClick={openSession}
             className="mt-3 w-full bg-blue-600 text-white text-sm font-medium rounded-lg px-3 py-2 disabled:opacity-50"
           >
-            {loading ? "열는 중..." : "열기"}
+            {loading ? "PDF 문서 준비중..." : "열기"}
           </button>
           {error && <p className="mt-2 text-xs text-rose-600">{error}</p>}
         </div>

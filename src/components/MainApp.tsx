@@ -362,11 +362,41 @@ export function MainApp({ initialSessionId }: { initialSessionId?: string }) {
     }
 
     try {
+      const uploadUrlResponse = await fetch("/api/share/upload-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId: session.id }),
+      });
+
+      const uploadUrlData = await uploadUrlResponse.json();
+      if (!uploadUrlResponse.ok) {
+        throw new Error(uploadUrlData.error ?? "업로드 URL 생성에 실패했습니다.");
+      }
+
+      const pdfBlob = await fetch(`data:application/pdf;base64,${session.pdfBase64}`).then((res) => res.blob());
+      const uploadResponse = await fetch(uploadUrlData.uploadUrl as string, {
+        method: "PUT",
+        headers: { "Content-Type": "application/pdf" },
+        body: pdfBlob,
+      });
+
+      if (!uploadResponse.ok) {
+        throw new Error("S3 업로드에 실패했습니다.");
+      }
+
       const response = await fetch("/api/share/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          session,
+          session: {
+            id: session.id,
+            fileName: session.fileName,
+            analysisData: session.analysisData,
+            messages: session.messages,
+            annotations: session.annotations,
+            createdAt: session.createdAt,
+          },
+          pdfS3Key: uploadUrlData.objectKey,
           password: password.trim(),
           chatLimitTotal: Math.floor(chatLimitTotal),
         }),

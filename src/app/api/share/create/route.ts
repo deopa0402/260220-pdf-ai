@@ -2,18 +2,17 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { randomUUID } from "node:crypto";
 import { createSharedSession } from "@/lib/db/share-repository";
-import { uploadPdfBase64ToS3 } from "@/lib/s3";
 
 const requestSchema = z.object({
   session: z.object({
     id: z.string().min(1),
     fileName: z.string().min(1),
-    pdfBase64: z.string().min(1),
     analysisData: z.unknown().nullable(),
     messages: z.array(z.object({ role: z.enum(["user", "ai"]), content: z.string() })).default([]),
     annotations: z.array(z.unknown()).optional(),
     createdAt: z.number(),
   }),
+  pdfS3Key: z.string().min(1),
   password: z.string().min(1),
   chatLimitTotal: z.number().int().min(0).max(200),
 });
@@ -25,13 +24,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "잘못된 요청 형식입니다." }, { status: 400 });
     }
 
-    const { session, password, chatLimitTotal } = parsed.data;
+    const { session, pdfS3Key, password, chatLimitTotal } = parsed.data;
     const publicId = randomUUID();
-
-    const pdfS3Key = await uploadPdfBase64ToS3({
-      sessionId: session.id,
-      pdfBase64: session.pdfBase64,
-    });
 
     await createSharedSession({
       id: randomUUID(),
