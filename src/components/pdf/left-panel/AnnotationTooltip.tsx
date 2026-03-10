@@ -122,7 +122,7 @@ export function AnnotationTooltip({
       }
 
       if (isImageRequest) {
-        const imageModel = genAI.getGenerativeModel({ model: "gemini-2.5-flash-image" });
+        const imageModel = genAI.getGenerativeModel({ model: "gemini-3.1-flash-image" });
         const imageResponse = await imageModel.generateContent([
           `사용자 요청: ${content}\n\n아래 이미지를 참고해서 요청에 맞는 새 이미지를 생성해줘.`,
           {

@@ -93,7 +93,7 @@ export function ImageChatPanel({ sessionId }: ImageChatPanelProps) {
       }
 
       if (isImageRequest) {
-        const imageModel = genAI.getGenerativeModel({ model: "gemini-2.5-flash-image" });
+        const imageModel = genAI.getGenerativeModel({ model: "gemini-3.1-flash-image" });
         const imagePrompt = history
           .map((m) => `[${m.role === "user" ? "사용자" : "AI"}] ${m.content}`)
           .join("\n\n");
