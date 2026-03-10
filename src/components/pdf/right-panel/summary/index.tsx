@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenAI } from "@google/genai";
 import { useAppStore } from "@/lib/app-store";
 import { store } from "@/lib/store";
 import type { AnalysisData } from "@/components/MainApp";
@@ -59,6 +59,7 @@ export function SummaryPanel({ analysisData, isAnalyzing, sessionId, onCitationC
     [chatMessagesBySession, sessionId]
   );
   const setChatMessagesForSession = useAppStore((s) => s.setChatMessagesForSession);
+  const selectedQnaModel = useAppStore((s) => s.selectedQnaModel);
 
   useEffect(() => {
     firstTurnDoneBySessionRef.current = Boolean(sessionId && messages.some((message) => message.role === "user"));
@@ -107,11 +108,7 @@ export function SummaryPanel({ analysisData, isAnalyzing, sessionId, onCitationC
         throw new Error("API 키가 없습니다. 다시 로그인해주세요.");
       }
 
-      const genAI = new GoogleGenerativeAI(apiKey);
-      const model = genAI.getGenerativeModel({
-        model: "gemini-2.5-flash",
-        systemInstruction: "당신은 문서 분석 AI 챗봇입니다. 제공된 문서와 사용자의 이전 대화 내역에 기반하여 사용자의 질문에 정확한 답변을 제공하세요. 답변의 문장 끝에는 근거 페이지를 반드시 표기하세요. 단일 페이지 예시: [3p]. 다중 페이지 예시: [3p],[5p]. [1p,2p]처럼 하나의 대괄호 안에 여러 페이지를 넣지 마세요. [Np] 같은 템플릿 표기는 절대 사용하지 마세요."
-      });
+      const ai = new GoogleGenAI({ apiKey });
 
       const isFirstTurn = !firstTurnDoneBySessionRef.current;
       const historyParts = newMessages
@@ -145,7 +142,14 @@ export function SummaryPanel({ analysisData, isAnalyzing, sessionId, onCitationC
         : [prompt];
       firstTurnDoneBySessionRef.current = true;
 
-      const result = await model.generateContentStream(contents);
+      const result = await ai.models.generateContentStream({
+        model: selectedQnaModel,
+        contents,
+        config: {
+          systemInstruction:
+            "당신은 문서 분석 AI 챗봇입니다. 제공된 문서와 사용자의 이전 대화 내역에 기반하여 사용자의 질문에 정확한 답변을 제공하세요. 답변의 문장 끝에는 근거 페이지를 반드시 표기하세요. 단일 페이지 예시: [3p]. 다중 페이지 예시: [3p],[5p]. [1p,2p]처럼 하나의 대괄호 안에 여러 페이지를 넣지 마세요. [Np] 같은 템플릿 표기는 절대 사용하지 마세요.",
+        },
+      });
 
       let botResponse = "";
       if (sessionId) {
@@ -160,8 +164,8 @@ export function SummaryPanel({ analysisData, isAnalyzing, sessionId, onCitationC
         frameId = null;
       };
 
-      for await (const chunk of result.stream) {
-        const chunkText = chunk.text();
+      for await (const chunk of result) {
+        const chunkText = chunk.text;
         if (!chunkText) continue;
 
         botResponse += chunkText;

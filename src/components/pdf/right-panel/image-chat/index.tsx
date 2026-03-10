@@ -1,8 +1,9 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenAI } from "@google/genai";
 import { Pencil, X } from "lucide-react";
+import { useAppStore } from "@/lib/app-store";
 import { ImageChatInput } from "./ImageChatInput";
 import { ImageChatTimeline } from "./ImageChatTimeline";
 import { ImageUploadCanvas } from "./ImageUploadCanvas";
@@ -28,6 +29,8 @@ export function ImageChatPanel({ sessionId }: ImageChatPanelProps) {
   const [toast, setToast] = useState<ToastState | null>(null);
   const toastTimerRef = useRef<number | null>(null);
   const [messagesBySession, setMessagesBySession] = useState<Record<string, ImageChatMessage[]>>({});
+  const selectedQnaModel = useAppStore((s) => s.selectedQnaModel);
+  const selectedImageModel = useAppStore((s) => s.selectedImageModel);
   const sessionKey = sessionId ?? "default-image-chat";
   const messages = useMemo(() => messagesBySession[sessionKey] ?? [], [messagesBySession, sessionKey]);
 
@@ -77,15 +80,17 @@ export function ImageChatPanel({ sessionId }: ImageChatPanelProps) {
       const apiKey = localStorage.getItem("gemini_api_key");
       if (!apiKey) throw new Error("API 키가 없습니다.");
 
-      const genAI = new GoogleGenerativeAI(apiKey);
+      const ai = new GoogleGenAI({ apiKey });
       const inlineData = editedImageDataUrl ? dataUrlToInlineData(editedImageDataUrl) : null;
 
       let isImageRequest = false;
       try {
-        const classifier = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
         const classificationPrompt = `${IMAGE_CLASSIFIER_PROMPT}\n이미지 첨부 여부: ${inlineData ? "YES" : "NO"}\n사용자 요청: "${userContent}"`;
-        const decisionResult = await classifier.generateContent(classificationPrompt);
-        const decision = decisionResult.response.text()?.trim().toUpperCase() ?? "";
+        const decisionResult = await ai.models.generateContent({
+          model: selectedQnaModel,
+          contents: classificationPrompt,
+        });
+        const decision = decisionResult.text?.trim().toUpperCase() ?? "";
         isImageRequest = decision.includes("IMAGE");
       } catch (classificationError) {
         console.error("Image chat classification failed", classificationError);
@@ -93,14 +98,16 @@ export function ImageChatPanel({ sessionId }: ImageChatPanelProps) {
       }
 
       if (isImageRequest) {
-        const imageModel = genAI.getGenerativeModel({ model: "gemini-3.1-flash-image" });
         const imagePrompt = history
           .map((m) => `[${m.role === "user" ? "사용자" : "AI"}] ${m.content}`)
           .join("\n\n");
 
-        const imageResult = await imageModel.generateContent(inlineData ? [imagePrompt, { inlineData }] : [imagePrompt]);
+        const imageResult = await ai.models.generateContent({
+          model: selectedImageModel,
+          contents: inlineData ? [imagePrompt, { inlineData }] : imagePrompt,
+        });
 
-        const parts = imageResult.response.candidates?.flatMap((candidate) => candidate.content?.parts ?? []) ?? [];
+        const parts = imageResult.candidates?.flatMap((candidate) => candidate.content?.parts ?? []) ?? [];
         const generatedImagePart = parts.find(
           (part) => part.inlineData?.data && part.inlineData?.mimeType?.startsWith("image/")
         );
@@ -119,23 +126,24 @@ export function ImageChatPanel({ sessionId }: ImageChatPanelProps) {
 
         setSessionMessages([...history, aiMessage]);
       } else {
-        const textModel = genAI.getGenerativeModel({
-          model: "gemini-2.5-flash",
-          systemInstruction:
-            "당신은 이미지 기획/편집을 도와주는 AI 어시스턴트입니다. 사용자의 요청을 한국어로 간결하고 실무적으로 답변하세요.",
-        });
-
         const prompt = `이전 대화:\n${history
           .map((m) => `[${m.role === "user" ? "사용자" : "AI"}] ${m.content}`)
           .join("\n\n")}\n\n사용자 최신 요청: ${userContent}`;
 
-        const streamResult = await textModel.generateContentStream(inlineData ? [prompt, { inlineData }] : [prompt]);
+        const streamResult = await ai.models.generateContentStream({
+          model: selectedQnaModel,
+          contents: inlineData ? [prompt, { inlineData }] : [prompt],
+          config: {
+            systemInstruction:
+              "당신은 이미지 기획/편집을 도와주는 AI 어시스턴트입니다. 사용자의 요청을 한국어로 간결하고 실무적으로 답변하세요.",
+          },
+        });
 
         let botResponse = "";
         setSessionMessages([...history, { role: "ai", content: "" }]);
 
-        for await (const chunk of streamResult.stream) {
-          const text = chunk.text();
+        for await (const chunk of streamResult) {
+          const text = chunk.text;
           if (!text) continue;
           botResponse += text;
           setSessionMessages([...history, { role: "ai", content: botResponse }]);

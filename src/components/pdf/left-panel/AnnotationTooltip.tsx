@@ -3,7 +3,7 @@
 import { useRef, useState, useEffect, useCallback } from 'react';
 import Draggable from 'react-draggable';
 import { X, Sparkles, GripHorizontal, Send } from 'lucide-react';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenAI } from '@google/genai';
 import { type Annotation } from '@/lib/store';
 import type { AnalysisData } from '@/components/MainApp';
 
@@ -92,7 +92,7 @@ export function AnnotationTooltip({
       const apiKey = localStorage.getItem("gemini_api_key");
       if (!apiKey) throw new Error("API 키가 없습니다.");
 
-      const genAI = new GoogleGenerativeAI(apiKey);
+      const ai = new GoogleGenAI({ apiKey });
 
       const historyParts = currentMessages.map(m => `[${m.role === "user" ? "사용자" : "AI"}]: ${m.content}`).join("\n\n");
       const contextText = isInitial ? buildContextText(analysisData) : "";
@@ -109,11 +109,11 @@ export function AnnotationTooltip({
       let isImageRequest = heuristicImageRequest;
       if (!isInitial) {
         try {
-          const classifierModel = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-          const classifierResult = await classifierModel.generateContent(
-            `다음 사용자 요청이 이미지 생성 요청인지 판별해줘.\n요청: "${content}"\n응답은 IMAGE 또는 TEXT 중 하나만 출력.`
-          );
-          const decision = classifierResult.response.text()?.trim().toUpperCase() ?? "";
+          const classifierResult = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: `다음 사용자 요청이 이미지 생성 요청인지 판별해줘.\n요청: "${content}"\n응답은 IMAGE 또는 TEXT 중 하나만 출력.`,
+          });
+          const decision = classifierResult.text?.trim().toUpperCase() ?? "";
           isImageRequest = heuristicImageRequest || decision.includes("IMAGE");
         } catch (classificationError) {
           console.error("Image request classification failed", classificationError);
@@ -122,15 +122,17 @@ export function AnnotationTooltip({
       }
 
       if (isImageRequest) {
-        const imageModel = genAI.getGenerativeModel({ model: "gemini-3.1-flash-image" });
-        const imageResponse = await imageModel.generateContent([
-          `사용자 요청: ${content}\n\n아래 이미지를 참고해서 요청에 맞는 새 이미지를 생성해줘.`,
-          {
-            inlineData: { data: base64Data, mimeType }
-          }
-        ]);
+        const imageResponse = await ai.models.generateContent({
+          model: "gemini-3.1-flash-image-preview",
+          contents: [
+            `사용자 요청: ${content}\n\n아래 이미지를 참고해서 요청에 맞는 새 이미지를 생성해줘.`,
+            {
+              inlineData: { data: base64Data, mimeType }
+            }
+          ],
+        });
 
-        const parts = imageResponse.response.candidates?.flatMap((candidate) => candidate.content?.parts ?? []) ?? [];
+        const parts = imageResponse.candidates?.flatMap((candidate) => candidate.content?.parts ?? []) ?? [];
         const generatedImagePart = parts.find((part) => part.inlineData?.data && part.inlineData?.mimeType?.startsWith("image/"));
         const generatedImageDataUrl = generatedImagePart?.inlineData
           ? `data:${generatedImagePart.inlineData.mimeType};base64,${generatedImagePart.inlineData.data}`
@@ -145,13 +147,15 @@ export function AnnotationTooltip({
         };
         onUpdate({ ...annotation, messages: [...currentMessages, aiMessage] });
       } else {
-        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-        const result = await model.generateContentStream([
-          prompt,
-          {
-            inlineData: { data: base64Data, mimeType }
-          }
-        ]);
+        const result = await ai.models.generateContentStream({
+          model: "gemini-2.5-flash",
+          contents: [
+            prompt,
+            {
+              inlineData: { data: base64Data, mimeType }
+            }
+          ],
+        });
 
         let botResponse = "";
         const streamingMessages = [...currentMessages, { role: "ai" as const, content: "" }];
@@ -162,8 +166,8 @@ export function AnnotationTooltip({
           frameIdRef.current = null;
         };
 
-        for await (const chunk of result.stream) {
-          const chunkText = chunk.text();
+        for await (const chunk of result) {
+          const chunkText = chunk.text;
           if (!chunkText) continue;
 
           botResponse += chunkText;
