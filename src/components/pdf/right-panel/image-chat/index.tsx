@@ -22,10 +22,18 @@ interface ToastState {
   type: "success" | "error";
 }
 
+interface DraftImage {
+  id: string;
+  dataUrl: string;
+}
+
+const MAX_ATTACHMENTS = 10;
+
 export function ImageChatPanel({ sessionId }: ImageChatPanelProps) {
   const [isTyping, setIsTyping] = useState(false);
-  const [draftImageDataUrl, setDraftImageDataUrl] = useState<string | null>(null);
+  const [draftImages, setDraftImages] = useState<DraftImage[]>([]);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
+  const [editingImageId, setEditingImageId] = useState<string | null>(null);
   const [toast, setToast] = useState<ToastState | null>(null);
   const toastTimerRef = useRef<number | null>(null);
   const [messagesBySession, setMessagesBySession] = useState<Record<string, ImageChatMessage[]>>({});
@@ -33,6 +41,10 @@ export function ImageChatPanel({ sessionId }: ImageChatPanelProps) {
   const selectedImageModel = useAppStore((s) => s.selectedImageModel);
   const sessionKey = sessionId ?? "default-image-chat";
   const messages = useMemo(() => messagesBySession[sessionKey] ?? [], [messagesBySession, sessionKey]);
+  const editingImage = useMemo(
+    () => (editingImageId ? draftImages.find((image) => image.id === editingImageId) ?? null : null),
+    [draftImages, editingImageId]
+  );
 
   const setSessionMessages = (next: ImageChatMessage[]) => {
     setMessagesBySession((prev) => ({ ...prev, [sessionKey]: next }));
@@ -50,42 +62,66 @@ export function ImageChatPanel({ sessionId }: ImageChatPanelProps) {
   };
 
   const handlePickImage = (file: File) => {
+    if (draftImages.length >= MAX_ATTACHMENTS) {
+      showToast(`이미지는 최대 ${MAX_ATTACHMENTS}개까지 첨부할 수 있습니다.`, "error");
+      return;
+    }
+
     const reader = new FileReader();
     reader.onload = () => {
-      setDraftImageDataUrl(String(reader.result));
+      const dataUrl = String(reader.result);
+      const id = typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : `img-${Date.now()}-${Math.random()}`;
+      setDraftImages((prev) => {
+        if (prev.length >= MAX_ATTACHMENTS) return prev;
+        return [...prev, { id, dataUrl }];
+      });
     };
     reader.readAsDataURL(file);
+  };
+
+  const removeDraftImage = (id: string) => {
+    setDraftImages((prev) => prev.filter((image) => image.id !== id));
+    if (editingImageId === id) {
+      setEditingImageId(null);
+      setIsEditorOpen(false);
+    }
   };
 
   const handleSend = async (content: string) => {
     if (isTyping) return;
 
     const normalizedContent = content.trim();
-    const editedImageDataUrl = draftImageDataUrl;
-    const userContent = normalizedContent || (editedImageDataUrl ? "이미지 참고 요청" : "");
-    if (!userContent && !editedImageDataUrl) return;
+    const editedImageDataUrls = draftImages.map((image) => image.dataUrl);
+    const userContent = normalizedContent || (editedImageDataUrls.length > 0 ? "이미지 참고 요청" : "");
+    if (!userContent && editedImageDataUrls.length === 0) return;
 
     const userMessage: ImageChatMessage = {
       role: "user",
       content: userContent,
-      imageDataUrl: editedImageDataUrl ?? undefined,
+      imageDataUrls: editedImageDataUrls.length > 0 ? editedImageDataUrls : undefined,
     };
 
     const history = [...messages, userMessage];
     setSessionMessages(history);
     setIsTyping(true);
-    setDraftImageDataUrl(null);
+    setDraftImages([]);
+    setEditingImageId(null);
 
     try {
       const apiKey = localStorage.getItem("gemini_api_key");
       if (!apiKey) throw new Error("API 키가 없습니다.");
 
       const ai = new GoogleGenAI({ apiKey });
-      const inlineData = editedImageDataUrl ? dataUrlToInlineData(editedImageDataUrl) : null;
+      const inlineDataParts = editedImageDataUrls
+        .map((dataUrl) => dataUrlToInlineData(dataUrl))
+        .filter((part): part is { data: string; mimeType: string } => Boolean(part))
+        .map((inlineData) => ({ inlineData }));
 
       let isImageRequest = false;
       try {
-        const classificationPrompt = `${IMAGE_CLASSIFIER_PROMPT}\n이미지 첨부 여부: ${inlineData ? "YES" : "NO"}\n사용자 요청: "${userContent}"`;
+        const classificationPrompt = `${IMAGE_CLASSIFIER_PROMPT}\n이미지 첨부 개수: ${inlineDataParts.length}\n사용자 요청: "${userContent}"`;
         const decisionResult = await ai.models.generateContent({
           model: selectedQnaModel,
           contents: classificationPrompt,
@@ -94,7 +130,7 @@ export function ImageChatPanel({ sessionId }: ImageChatPanelProps) {
         isImageRequest = decision.includes("IMAGE");
       } catch (classificationError) {
         console.error("Image chat classification failed", classificationError);
-        isImageRequest = looksLikeImageRequest(userContent) || Boolean(inlineData);
+        isImageRequest = looksLikeImageRequest(userContent) || inlineDataParts.length > 0;
       }
 
       if (isImageRequest) {
@@ -104,7 +140,7 @@ export function ImageChatPanel({ sessionId }: ImageChatPanelProps) {
 
         const imageResult = await ai.models.generateContent({
           model: selectedImageModel,
-          contents: inlineData ? [imagePrompt, { inlineData }] : imagePrompt,
+          contents: inlineDataParts.length > 0 ? [imagePrompt, ...inlineDataParts] : imagePrompt,
         });
 
         const parts = imageResult.candidates?.flatMap((candidate) => candidate.content?.parts ?? []) ?? [];
@@ -121,7 +157,7 @@ export function ImageChatPanel({ sessionId }: ImageChatPanelProps) {
           content: generatedImageDataUrl
             ? "요청에 맞는 이미지를 생성했습니다."
             : "이미지를 생성하지 못했습니다. 프롬프트를 조금 더 구체적으로 입력해 주세요.",
-          imageDataUrl: generatedImageDataUrl,
+          imageDataUrls: generatedImageDataUrl ? [generatedImageDataUrl] : undefined,
         };
 
         setSessionMessages([...history, aiMessage]);
@@ -132,7 +168,7 @@ export function ImageChatPanel({ sessionId }: ImageChatPanelProps) {
 
         const streamResult = await ai.models.generateContentStream({
           model: selectedQnaModel,
-          contents: inlineData ? [prompt, { inlineData }] : [prompt],
+          contents: inlineDataParts.length > 0 ? [prompt, ...inlineDataParts] : [prompt],
           config: {
             systemInstruction:
               "당신은 이미지 기획/편집을 도와주는 AI 어시스턴트입니다. 사용자의 요청을 한국어로 간결하고 실무적으로 답변하세요.",
@@ -195,36 +231,35 @@ export function ImageChatPanel({ sessionId }: ImageChatPanelProps) {
         </div>
       </div>
 
-      {draftImageDataUrl && (
+      {draftImages.length > 0 && (
         <div className="px-3 pb-2 bg-white border-t border-gray-100">
-          <div className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-2 py-2">
-            <button
-              type="button"
-              onClick={() => setIsEditorOpen(true)}
-              className="relative group"
-              title="클릭하여 확대/드로잉 편집"
-            >
-              <img src={draftImageDataUrl} alt="첨부 이미지 미리보기" className="w-16 h-16 rounded-md object-cover border border-gray-200" />
-              <span className="absolute inset-0 hidden group-hover:flex items-center justify-center bg-black/40 text-white text-[10px] rounded-md">
-                편집
-              </span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setIsEditorOpen(true)}
-              className="inline-flex items-center gap-1 text-xs font-medium text-blue-700 hover:text-blue-800"
-            >
-              <Pencil className="w-3.5 h-3.5" />
-              확대/드로잉
-            </button>
-            <button
-              type="button"
-              onClick={() => setDraftImageDataUrl(null)}
-              className="ml-1 p-1 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-200"
-              title="첨부 제거"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2 rounded-lg border border-gray-200 bg-gray-50 px-2 py-2">
+            {draftImages.map((image) => (
+              <div key={image.id} className="relative group">
+                <img src={image.dataUrl} alt="첨부 이미지 미리보기" className="w-full h-16 rounded-md object-cover border border-gray-200" />
+                <div className="absolute top-1 right-1 flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingImageId(image.id);
+                      setIsEditorOpen(true);
+                    }}
+                    className="p-1 rounded-md bg-black/45 text-white hover:bg-black/60"
+                    title="편집"
+                  >
+                    <Pencil className="w-3 h-3" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => removeDraftImage(image.id)}
+                    className="p-1 rounded-md bg-black/45 text-white hover:bg-black/60"
+                    title="첨부 제거"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}
@@ -232,18 +267,27 @@ export function ImageChatPanel({ sessionId }: ImageChatPanelProps) {
       <ImageChatInput
         onSend={handleSend}
         onPickImage={handlePickImage}
-        hasAttachment={Boolean(draftImageDataUrl)}
+        hasAttachment={draftImages.length > 0}
+        attachmentCount={draftImages.length}
+        maxAttachments={MAX_ATTACHMENTS}
+        canAttachMore={draftImages.length < MAX_ATTACHMENTS}
         disabled={isTyping}
       />
 
-      {isEditorOpen && draftImageDataUrl && (
+      {isEditorOpen && editingImage && (
         <ImageUploadCanvas
-          imageDataUrl={draftImageDataUrl}
+          imageDataUrl={editingImage.dataUrl}
           disabled={isTyping}
-          onClose={() => setIsEditorOpen(false)}
-          onApply={(next) => {
-            setDraftImageDataUrl(next);
+          onClose={() => {
             setIsEditorOpen(false);
+            setEditingImageId(null);
+          }}
+          onApply={(next) => {
+            setDraftImages((prev) => prev.map((image) => (
+              image.id === editingImageId ? { ...image, dataUrl: next } : image
+            )));
+            setIsEditorOpen(false);
+            setEditingImageId(null);
           }}
         />
       )}

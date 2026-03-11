@@ -22,7 +22,8 @@ export function ImageChatTimeline({ messages, isTyping, onCopyImage }: ImageChat
   return (
     <div className="space-y-4 pt-1 pb-4">
       {messages.map((msg, index) => {
-        const imageDataUrl = msg.imageDataUrl;
+        const imageDataUrls = msg.imageDataUrls ?? [];
+        const imageKeyCounts = new Map<string, number>();
         return (
         <div key={`image-chat-${index}-${msg.role}`} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
           {msg.role === "ai" && (
@@ -38,21 +39,28 @@ export function ImageChatTimeline({ messages, isTyping, onCopyImage }: ImageChat
             }`}
           >
             <p className="whitespace-pre-wrap">{msg.content}</p>
-            {imageDataUrl && (
-              <div className="relative mt-2">
-                <img
-                  src={imageDataUrl}
-                  alt="chat attachment"
-                  className="rounded-lg border border-gray-200/70 w-full max-w-[160px] sm:max-w-[200px] md:max-w-[240px] h-auto"
-                />
-                <button
-                  type="button"
-                  onClick={() => onCopyImage(imageDataUrl)}
-                  className="absolute top-1.5 right-1.5 p-1 rounded-md bg-black/45 text-white hover:bg-black/60 transition-colors"
-                  title="이미지 복사"
-                >
-                  <Copy className="w-3.5 h-3.5" />
-                </button>
+            {imageDataUrls.length > 0 && (
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                {imageDataUrls.map((imageDataUrl) => {
+                  const nextCount = (imageKeyCounts.get(imageDataUrl) ?? 0) + 1;
+                  imageKeyCounts.set(imageDataUrl, nextCount);
+                  return (
+                  <div key={`${imageDataUrl}-${nextCount}`} className="relative">
+                    <img
+                      src={imageDataUrl}
+                      alt="chat attachment"
+                      className="rounded-lg border border-gray-200/70 w-full max-w-[160px] sm:max-w-[200px] md:max-w-[240px] h-auto"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => onCopyImage(imageDataUrl)}
+                      className="absolute top-1.5 right-1.5 p-1 rounded-md bg-black/45 text-white hover:bg-black/60 transition-colors"
+                      title="이미지 복사"
+                    >
+                      <Copy className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                );})}
               </div>
             )}
           </div>

@@ -5,10 +5,21 @@ interface ImageChatInputProps {
   onSend: (content: string) => void;
   onPickImage: (file: File) => void;
   hasAttachment?: boolean;
+  attachmentCount?: number;
+  maxAttachments?: number;
+  canAttachMore?: boolean;
   disabled?: boolean;
 }
 
-export function ImageChatInput({ onSend, onPickImage, hasAttachment, disabled }: ImageChatInputProps) {
+export function ImageChatInput({
+  onSend,
+  onPickImage,
+  hasAttachment,
+  attachmentCount = 0,
+  maxAttachments = 10,
+  canAttachMore = true,
+  disabled,
+}: ImageChatInputProps) {
   const [input, setInput] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -35,9 +46,9 @@ export function ImageChatInput({ onSend, onPickImage, hasAttachment, disabled }:
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
-          disabled={disabled}
+          disabled={disabled || !canAttachMore}
           className="absolute left-1 top-1 bottom-1 px-2 text-gray-400 hover:text-blue-600 rounded-lg transition-colors disabled:opacity-40"
-          title="이미지 첨부"
+          title={canAttachMore ? "이미지 첨부" : `최대 ${maxAttachments}개 첨부 가능`}
         >
           <ImagePlus className="w-4 h-4" />
         </button>
@@ -46,10 +57,10 @@ export function ImageChatInput({ onSend, onPickImage, hasAttachment, disabled }:
           type="file"
           accept="image/*"
           className="hidden"
-          disabled={disabled}
+          disabled={disabled || !canAttachMore}
           onChange={(event) => {
             const file = event.target.files?.[0];
-            if (file) onPickImage(file);
+            if (file && canAttachMore) onPickImage(file);
             event.currentTarget.value = "";
           }}
         />
@@ -68,7 +79,7 @@ export function ImageChatInput({ onSend, onPickImage, hasAttachment, disabled }:
             for (const item of items) {
               if (item.type.startsWith("image/")) {
                 const file = item.getAsFile();
-                if (file) {
+                if (file && canAttachMore) {
                   onPickImage(file);
                   event.preventDefault();
                 }
@@ -94,6 +105,9 @@ export function ImageChatInput({ onSend, onPickImage, hasAttachment, disabled }:
         >
           <Send className="w-4 h-4 ml-0.5" />
         </button>
+      </div>
+      <div className="mt-2 text-[11px] text-gray-500 text-right">
+        첨부 {attachmentCount}/{maxAttachments}
       </div>
     </div>
   );
